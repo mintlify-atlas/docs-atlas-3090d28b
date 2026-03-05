@@ -1,0 +1,227 @@
+---
+title: 'Movie Dialog'
+description: 'Material dialog component displaying detailed media information'
+icon: 'window-maximize'
+---
+
+## Overview
+
+The Movie Dialog component displays comprehensive information about a selected media item (movie, series, or game) in a Material Design dialog. It includes poster image, plot details, ratings, and action buttons.
+
+**Location**: `src/app/shared/components/movie-dialog/movie-dialog.component.ts`
+
+## Key Features
+
+- **Detailed Information**: Director, actors, plot, genre, language, country, runtime
+- **IMDB Integration**: Displays IMDB rating and vote count
+- **Trailer Support**: Button to watch trailer if available
+- **Add to Favorites**: Quick-add button (hidden if viewing from favorites)
+- **Fallback Image**: Automatic placeholder for missing posters
+- **Authentication Check**: Redirects to login if user not authenticated
+
+## Component Structure
+
+```typescript
+@Component({
+  selector: 'app-movie-dialog',
+  templateUrl: './movie-dialog.component.html',
+  styleUrls: ['./movie-dialog.component.scss']
+})
+export class MediaItemDialogComponent {
+  showPlayer = false;
+  videoUrl!: SafeResourceUrl;
+  imdbLogoPath = '/assets/images/imdb.png';
+  
+  constructor(
+    @Inject(MAT_DIALOG_DATA) public data: MediaItemDialogData,
+    private toastrService: ToastrService,
+    private favoritesService: FavoritesService,
+    private authService: AuthService,
+    private router: Router,
+    private dialogRef: MatDialogRef<MediaItemDialogComponent>,
+    private dialogService: DialogService
+  ) { }
+}
+```
+
+## Dialog Data Interface
+
+<ParamField path="data" type="MediaItemDialogData">
+  Data injected via MAT_DIALOG_DATA
+</ParamField>
+
+```typescript
+interface MediaItemDialogData {
+  movie: MediaItem;              // Basic media item data
+  response: DetailedMediaItem;   // Full details from OMDB
+  fromFavoritesSection: boolean; // Controls "Add to Favorites" button visibility
+}
+```
+
+## Opening the Dialog
+
+Use the `DialogService` to open the movie dialog:
+
+```typescript
+this.dialogService
+  .openMediaItem(window.innerWidth, mediaItem, false)
+  .subscribe();
+```
+
+### Parameters:
+
+- `windowWidth`: Screen width for responsive sizing
+- `mediaItem`: The media item to display
+- `fromFavorites`: Whether opened from favorites page
+
+## Core Methods
+
+### addToFavorites()
+
+Adds the media item to user's favorites with authentication check.
+
+```typescript
+addToFavorites(mediaItem: MediaItem) {
+  this.authService.isLoggedInObservable().pipe(
+    take(1),
+    switchMap(loggedIn => {
+      if (!loggedIn) {
+        this.toastrService.error('You must be logged in to add movies to your list', 'Error');
+        this.dialogRef.close();
+        this.router.navigate(['/auth/login']);
+        return EMPTY; 
+      }
+      return this.favoritesService.addToFavorites(mediaItem);
+    })
+  ).subscribe({
+    next: () => this.toastrService.success(mediaItem.title, 'Added to favorites'),
+    error: (error) => this.toastrService.warning(error.message)
+  });
+}
+```
+
+### playTrailer()
+
+Opens the trailer dialog if a YouTube URL is available.
+
+```typescript
+playTrailer(): void {
+  if (!this.data.response.youtubeURLTrailer) return;
+
+  this.dialogService.openTrailerDialog(
+    this.data.response.youtubeURLTrailer,
+  );
+}
+```
+
+### onImageError()
+
+Handles poster image loading errors with fallback.
+
+```typescript
+onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = 'assets/images/no_poster.jpg';
+}
+```
+
+## Template Structure
+
+```html
+<h1 mat-dialog-title>{{data.response.Title}} ({{data.response.Year}})</h1>
+
+<mat-dialog-content class="card-content mat-typography">
+  <div class="poster-container">
+    <ng-container *ngIf="data.response.Poster === 'N/A'; else poster">
+      <img src="/assets/images/no_poster.jpg" alt="No poster">
+    </ng-container>
+    <ng-template #poster>
+      <img [src]="data.response.Poster" [alt]="data.response.Title" appFallback>
+    </ng-template>
+  </div>
+  
+  <div class="details-container">
+    <p><span class="title">Director:</span> {{data.response.Director}}</p>
+    <p><span class="title">Actors:</span> {{data.response.Actors}}</p>
+    <p><span class="title">Plot:</span> {{data.response.Plot}}</p>
+    <p><span class="title">Genre:</span> {{data.response.Genre}}</p>
+    <p><span class="title">Language:</span> {{data.response.Language}}</p>
+    <p><span class="title">Country:</span> {{data.response.Country}}</p>
+    <p><span class="title">Runtime:</span> {{data.response.Runtime}}</p>
+  </div>
+
+  <div class="rating-container">
+    <img [src]="imdbLogoPath" alt="imdb logo">
+    <span class="rating">
+      <mat-icon class="star">star</mat-icon>
+      {{data.response.imdbRating}}
+    </span>
+    <span>({{data.response.imdbVotes}})</span>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="center">
+  <button mat-raised-button mat-dialog-close color="primary">
+    <mat-icon>close</mat-icon>
+    Close
+  </button>
+  
+  <ng-container *ngIf="!data.fromFavoritesSection">
+    <button mat-raised-button color="accent" (click)="addToFavorites(data.movie)">
+      <mat-icon>favorite</mat-icon>
+      Add
+    </button>
+  </ng-container>
+  
+  <ng-container *ngIf="data.response.youtubeURLTrailer && !showPlayer">
+    <button mat-raised-button color="warn" (click)="playTrailer()">
+      <mat-icon>ondemand_video</mat-icon>
+      Watch trailer
+    </button>
+  </ng-container>
+</mat-dialog-actions>
+```
+
+## Displayed Information
+
+### Header
+- **Title**: Media item title
+- **Year**: Release year
+
+### Content
+- **Poster**: Image or fallback placeholder
+- **Director**: Director name(s)
+- **Actors**: Main cast
+- **Plot**: Story synopsis
+- **Genre**: Genre categories
+- **Language**: Original language(s)
+- **Country**: Country of origin
+- **Runtime**: Duration
+
+### Rating Section
+- **IMDB Logo**: Branding
+- **Rating**: Star icon with numerical rating
+- **Votes**: Total vote count
+
+## Action Buttons
+
+### Close Button
+Always visible. Closes the dialog.
+
+### Add to Favorites Button
+- Only visible when `fromFavoritesSection` is false
+- Checks authentication before adding
+- Redirects to login if not authenticated
+
+### Watch Trailer Button
+- Only visible when `youtubeURLTrailer` exists
+- Opens trailer in a separate dialog
+
+## Dependencies
+
+- **@angular/material/dialog**: Dialog infrastructure
+- **FavoritesService**: Adds items to favorites
+- **AuthService**: Checks authentication state
+- **DialogService**: Opens nested trailer dialog
+- **ToastrService**: Displays notifications
+- **Router**: Navigates to login when needed

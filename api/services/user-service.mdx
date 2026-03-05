@@ -1,0 +1,288 @@
+---
+title: 'UserService'
+description: 'Service for user authentication endpoints - login and registration'
+icon: 'user'
+---
+
+## Overview
+
+The `UserService` handles user authentication operations including login and registration. It communicates with the backend API to authenticate users and create new accounts.
+
+## Import
+
+```typescript
+import { UserService } from 'src/app/core/services/user.service';
+import { User, LoginResponse, RegisterResponse } from 'src/app/shared/models/auth.model';
+```
+
+## Methods
+
+### login
+
+Authenticates a user with email and password credentials.
+
+```typescript
+login(formData: User): Observable<LoginResponse>
+```
+
+<ParamField path="formData" type="User" required>
+  User credentials object containing email and password
+</ParamField>
+
+<ResponseField name="return" type="Observable<LoginResponse>">
+  Observable that emits a LoginResponse containing the JWT token and user data
+</ResponseField>
+
+**HTTP Details:**
+- Method: `POST`
+- Endpoint: `${environment.serverUserURL}/login`
+- Headers: `Content-Type: application/json`
+- Body: User object
+
+**Example:**
+
+```typescript
+import { Component } from '@angular/core';
+import { UserService } from 'src/app/core/services/user.service';
+import { AuthService } from 'src/app/core/services/auth.service';
+import { User } from 'src/app/shared/models/auth.model';
+
+@Component({
+  selector: 'app-login',
+  templateUrl: './login.component.html'
+})
+export class LoginComponent {
+  constructor(
+    private userService: UserService,
+    private authService: AuthService
+  ) {}
+
+  onLogin(email: string, password: string) {
+    const credentials: User = {
+      email: email,
+      password: password,
+      name: '' // Name not required for login
+    };
+
+    this.userService.login(credentials).subscribe({
+      next: (response) => {
+        console.log('Login successful');
+        console.log('Token:', response.token);
+        console.log('User:', response.user);
+        
+        // Store the session
+        this.authService.setUserSession(response.user, response.token);
+        
+        // Navigate to home or dashboard
+      },
+      error: (error) => {
+        if (error.status === 401) {
+          console.error('Invalid credentials');
+        } else {
+          console.error('Login failed:', error);
+        }
+      }
+    });
+  }
+}
+```
+
+---
+
+### register
+
+Registers a new user account.
+
+```typescript
+register(formData: User): Observable<RegisterResponse>
+```
+
+<ParamField path="formData" type="User" required>
+  User registration data containing name, email, and password
+</ParamField>
+
+<ResponseField name="return" type="Observable<RegisterResponse>">
+  Observable that emits a RegisterResponse (AuthUser) containing the created user data without the password
+</ResponseField>
+
+**HTTP Details:**
+- Method: `POST`
+- Endpoint: `${environment.serverUserURL}/register`
+- Headers: `Content-Type: application/json`
+- Body: User object
+
+**Example:**
+
+```typescript
+import { Component } from '@angular/core';
+import { UserService } from 'src/app/core/services/user.service';
+import { User } from 'src/app/shared/models/auth.model';
+import { Router } from '@angular/router';
+
+@Component({
+  selector: 'app-register',
+  templateUrl: './register.component.html'
+})
+export class RegisterComponent {
+  constructor(
+    private userService: UserService,
+    private router: Router
+  ) {}
+
+  onRegister(name: string, email: string, password: string) {
+    const newUser: User = {
+      name: name,
+      email: email,
+      password: password
+    };
+
+    this.userService.register(newUser).subscribe({
+      next: (response) => {
+        console.log('Registration successful');
+        console.log('Created user:', response);
+        console.log('User ID:', response._id);
+        console.log('Email:', response.email);
+        
+        // Redirect to login page
+        this.router.navigate(['/auth/login']);
+      },
+      error: (error) => {
+        if (error.message === 'User with this email already exists') {
+          console.error('Email already registered');
+        } else {
+          console.error('Registration failed:', error);
+        }
+      }
+    });
+  }
+}
+```
+
+## Environment Configuration
+
+The service uses `environment.serverUserURL` from the environment configuration:
+
+```typescript
+// environment.development.ts
+export const environment = {
+  serverUserURL: 'http://localhost:3000/api/users'
+};
+```
+
+## HTTP Headers
+
+Both methods use the same HTTP headers:
+
+```typescript
+const httpOptions = {
+  headers: new HttpHeaders({
+    'Content-Type': 'application/json',
+  }),
+};
+```
+
+## Error Handling
+
+Common error responses:
+
+**Login Errors:**
+- `401 Unauthorized` - Invalid email or password
+- `0 Network Error` - Cannot connect to server
+
+**Registration Errors:**
+- `409 Conflict` - User with email already exists (error.error.code === 'USER_EXISTS')
+- `0 Network Error` - Cannot connect to server
+
+These errors are processed by the [ErrorInterceptor](/api/interceptors/error-interceptor).
+
+## Complete Usage Example
+
+```typescript
+import { Component } from '@angular/core';
+import { FormBuilder, FormGroup, Validators } from '@angular/forms';
+import { UserService } from 'src/app/core/services/user.service';
+import { AuthService } from 'src/app/core/services/auth.service';
+import { Router } from '@angular/router';
+import { User } from 'src/app/shared/models/auth.model';
+
+@Component({
+  selector: 'app-auth',
+  templateUrl: './auth.component.html'
+})
+export class AuthComponent {
+  loginForm: FormGroup;
+  registerForm: FormGroup;
+  isLoginMode = true;
+
+  constructor(
+    private fb: FormBuilder,
+    private userService: UserService,
+    private authService: AuthService,
+    private router: Router
+  ) {
+    this.loginForm = this.fb.group({
+      email: ['', [Validators.required, Validators.email]],
+      password: ['', [Validators.required, Validators.minLength(6)]]
+    });
+
+    this.registerForm = this.fb.group({
+      name: ['', Validators.required],
+      email: ['', [Validators.required, Validators.email]],
+      password: ['', [Validators.required, Validators.minLength(6)]]
+    });
+  }
+
+  onLogin() {
+    if (this.loginForm.valid) {
+      const credentials: User = {
+        email: this.loginForm.value.email,
+        password: this.loginForm.value.password,
+        name: ''
+      };
+
+      this.userService.login(credentials).subscribe({
+        next: (response) => {
+          this.authService.setUserSession(response.user, response.token);
+          this.router.navigate(['/dashboard']);
+        },
+        error: (error) => {
+          console.error('Login failed:', error.message);
+        }
+      });
+    }
+  }
+
+  onRegister() {
+    if (this.registerForm.valid) {
+      const newUser: User = {
+        name: this.registerForm.value.name,
+        email: this.registerForm.value.email,
+        password: this.registerForm.value.password
+      };
+
+      this.userService.register(newUser).subscribe({
+        next: (response) => {
+          console.log('Registration successful:', response);
+          this.isLoginMode = true; // Switch to login mode
+          this.loginForm.patchValue({ email: response.email });
+        },
+        error: (error) => {
+          console.error('Registration failed:', error.message);
+        }
+      });
+    }
+  }
+
+  toggleMode() {
+    this.isLoginMode = !this.isLoginMode;
+  }
+}
+```
+
+## Related
+
+- [AuthService](/api/services/auth-service) - For storing user session after login
+- [User Model](/api/models/auth-user) - User data structure for requests
+- [AuthUser Model](/api/models/auth-user) - Safe user data structure for responses
+- [LoginResponse Model](/api/models/auth-user) - Login response structure
+- [ErrorInterceptor](/api/interceptors/error-interceptor) - Handles authentication errors

@@ -1,0 +1,479 @@
+---
+title: 'OMDB Response Models'
+description: 'Response interfaces for OMDB API: OmdbResponse and OmdbDetails'
+icon: 'database'
+---
+
+## Overview
+
+ScreenPulse uses two main interfaces for OMDB API responses: `OmdbResponse` for search results and `OmdbDetails` for detailed media information.
+
+## Import
+
+```typescript
+import { OmdbResponse } from 'src/app/shared/models/omdbResponse.model';
+import { OmdbDetails } from 'src/app/shared/models/ombdDetails';
+import { MediaItem } from 'src/app/shared/models/movie.model';
+```
+
+## OmdbResponse Interface
+
+Response structure from OMDB search endpoint. Contains an array of search results.
+
+### Definition
+
+```typescript
+export interface OmdbResponse {
+  Response: 'True' | 'False';
+  Search?: MediaItem[];
+  totalResults?: string;
+  Error?: string;
+}
+```
+
+### Fields
+
+<ResponseField name="Response" type="'True' | 'False'" required>
+  Indicates whether the search was successful. `'True'` for success, `'False'` for error.
+</ResponseField>
+
+<ResponseField name="Search" type="MediaItem[]">
+  Array of media items found. Only present when `Response` is `'True'`. Each item contains title, year, imdbID, type, and poster.
+</ResponseField>
+
+<ResponseField name="totalResults" type="string">
+  Total number of results found as a string. Only present when `Response` is `'True'`. Parse to number for pagination calculations.
+</ResponseField>
+
+<ResponseField name="Error" type="string">
+  Error message. Only present when `Response` is `'False'`. Common values: `'Movie not found!'`, `'Too many results.'`
+</ResponseField>
+
+### Usage Examples
+
+**Successful Search:**
+
+```typescript
+import { OmdbService } from 'src/app/shared/services/omdb/omdb.service';
+import { OmdbResponse } from 'src/app/shared/models/omdbResponse.model';
+import { MediaItem } from 'src/app/shared/models/movie.model';
+
+omdbService.fetchMediaItems('Batman', 'movie', '', 1).subscribe({
+  next: (response: OmdbResponse) => {
+    if (response.Response === 'True') {
+      // Success case
+      const results: MediaItem[] = response.Search || [];
+      const total: number = parseInt(response.totalResults || '0');
+      
+      console.log(`Found ${total} results`);
+      results.forEach(item => {
+        console.log(`${item.title} (${item.year})`);
+      });
+    } else {
+      // Error case
+      console.error('Search failed:', response.Error);
+    }
+  }
+});
+```
+
+**Example Successful Response:**
+
+```json
+{
+  "Response": "True",
+  "Search": [
+    {
+      "title": "Batman Begins",
+      "year": "2005",
+      "imdbID": "tt0372784",
+      "type": "movie",
+      "poster": "https://m.media-amazon.com/images/M/MV5BOTY4YjI2N2MtYmFlMC00ZjcyLTg3YjEtMDQyM2ZjYzQ5YWFkXkEyXkFqcGdeQXVyMTQxNzMzNDI@._V1_SX300.jpg"
+    },
+    {
+      "title": "The Dark Knight",
+      "year": "2008",
+      "imdbID": "tt0468569",
+      "type": "movie",
+      "poster": "https://m.media-amazon.com/images/M/MV5BMTMxNTMwODM0NF5BMl5BanBnXkFtZTcwODAyMTk2Mw@@._V1_SX300.jpg"
+    }
+  ],
+  "totalResults": "468"
+}
+```
+
+**Example Error Response:**
+
+```json
+{
+  "Response": "False",
+  "Error": "Movie not found!"
+}
+```
+
+**Handling Pagination:**
+
+```typescript
+import { Component } from '@angular/core';
+import { OmdbService } from 'src/app/shared/services/omdb/omdb.service';
+import { MediaItem } from 'src/app/shared/models/movie.model';
+
+@Component({
+  selector: 'app-search-results',
+  templateUrl: './search-results.component.html'
+})
+export class SearchResultsComponent {
+  results: MediaItem[] = [];
+  totalResults: number = 0;
+  currentPage: number = 1;
+  pageSize: number = 10; // OMDB returns 10 items per page
+  totalPages: number = 0;
+
+  constructor(private omdbService: OmdbService) {}
+
+  search(title: string) {
+    this.omdbService.fetchMediaItems(title, '', '', this.currentPage)
+      .subscribe(response => {
+        if (response.Response === 'True') {
+          this.results = response.Search || [];
+          this.totalResults = parseInt(response.totalResults || '0');
+          this.totalPages = Math.ceil(this.totalResults / this.pageSize);
+        } else {
+          this.results = [];
+          this.totalResults = 0;
+          console.error(response.Error);
+        }
+      });
+  }
+
+  nextPage() {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+      this.search('Batman');
+    }
+  }
+
+  previousPage() {
+    if (this.currentPage > 1) {
+      this.currentPage--;
+      this.search('Batman');
+    }
+  }
+}
+```
+
+---
+
+## OmdbDetails Interface
+
+Detailed information about a specific media item. Contains comprehensive metadata including ratings, cast, and trailer URL.
+
+### Definition
+
+```typescript
+export interface OmdbDetails {
+  Title: string;
+  Year: string;
+  Rated: string;
+  Released: string;
+  Runtime: string;
+  Genre: string;
+  Director: string;
+  Writer: string;
+  Actors: string;
+  Plot: string;
+  Language: string;
+  Country: string;
+  Awards: string;
+  Poster: string;
+  Ratings: {
+    Source: string;
+    Value: string;
+  }[];
+  Metascore: string;
+  imdbRating: string;
+  imdbVotes: string;
+  imdbID: string;
+  Type: string;
+  totalSeasons?: string;
+  Response: string;
+  youtubeURLTrailer: string;
+}
+```
+
+### Fields
+
+<ResponseField name="Title" type="string" required>
+  The full title of the media item
+</ResponseField>
+
+<ResponseField name="Year" type="string" required>
+  Release year or year range for series
+</ResponseField>
+
+<ResponseField name="Rated" type="string" required>
+  Content rating (e.g., 'PG-13', 'R', 'TV-MA')
+</ResponseField>
+
+<ResponseField name="Released" type="string" required>
+  Release date in format 'DD MMM YYYY'
+</ResponseField>
+
+<ResponseField name="Runtime" type="string" required>
+  Duration (e.g., '148 min')
+</ResponseField>
+
+<ResponseField name="Genre" type="string" required>
+  Comma-separated genres (e.g., 'Action, Sci-Fi, Thriller')
+</ResponseField>
+
+<ResponseField name="Director" type="string" required>
+  Director name(s)
+</ResponseField>
+
+<ResponseField name="Writer" type="string" required>
+  Writer name(s)
+</ResponseField>
+
+<ResponseField name="Actors" type="string" required>
+  Comma-separated actor names
+</ResponseField>
+
+<ResponseField name="Plot" type="string" required>
+  Full plot summary
+</ResponseField>
+
+<ResponseField name="Language" type="string" required>
+  Comma-separated languages
+</ResponseField>
+
+<ResponseField name="Country" type="string" required>
+  Country of origin
+</ResponseField>
+
+<ResponseField name="Awards" type="string" required>
+  Awards and nominations summary
+</ResponseField>
+
+<ResponseField name="Poster" type="string" required>
+  URL to high-resolution poster image
+</ResponseField>
+
+<ResponseField name="Ratings" type="Array<{Source: string, Value: string}>" required>
+  Array of ratings from different sources (IMDb, Rotten Tomatoes, Metacritic)
+</ResponseField>
+
+<ResponseField name="Metascore" type="string" required>
+  Metacritic score (0-100)
+</ResponseField>
+
+<ResponseField name="imdbRating" type="string" required>
+  IMDb rating (0.0-10.0)
+</ResponseField>
+
+<ResponseField name="imdbVotes" type="string" required>
+  Number of IMDb votes (e.g., '2,341,678')
+</ResponseField>
+
+<ResponseField name="imdbID" type="string" required>
+  Unique IMDb identifier
+</ResponseField>
+
+<ResponseField name="Type" type="string" required>
+  Media type: 'movie', 'series', or 'episode'
+</ResponseField>
+
+<ResponseField name="totalSeasons" type="string">
+  Number of seasons (only for TV series)
+</ResponseField>
+
+<ResponseField name="Response" type="string" required>
+  Response status ('True' or 'False')
+</ResponseField>
+
+<ResponseField name="youtubeURLTrailer" type="string" required>
+  YouTube URL for the trailer video (custom field added by ScreenPulse backend)
+</ResponseField>
+
+### Usage Examples
+
+**Fetching and Displaying Details:**
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { ActivatedRoute } from '@angular/router';
+import { OmdbService } from 'src/app/shared/services/omdb/omdb.service';
+import { OmdbDetails } from 'src/app/shared/models/ombdDetails';
+
+@Component({
+  selector: 'app-media-details',
+  templateUrl: './media-details.component.html'
+})
+export class MediaDetailsComponent implements OnInit {
+  details: OmdbDetails | null = null;
+  loading: boolean = true;
+
+  constructor(
+    private omdbService: OmdbService,
+    private route: ActivatedRoute
+  ) {}
+
+  ngOnInit() {
+    const imdbId = this.route.snapshot.paramMap.get('id') || '';
+    this.loadDetails(imdbId);
+  }
+
+  loadDetails(imdbId: string) {
+    this.omdbService.getMediaItemInfo(imdbId).subscribe({
+      next: (details: OmdbDetails) => {
+        this.details = details;
+        this.loading = false;
+        
+        console.log('Title:', details.Title);
+        console.log('Year:', details.Year);
+        console.log('Rating:', details.imdbRating);
+        console.log('Plot:', details.Plot);
+        console.log('Trailer:', details.youtubeURLTrailer);
+      },
+      error: (error) => {
+        console.error('Failed to load details:', error);
+        this.loading = false;
+      }
+    });
+  }
+
+  getRatingsDisplay(): string {
+    if (!this.details) return '';
+    
+    return this.details.Ratings
+      .map(r => `${r.Source}: ${r.Value}`)
+      .join(' | ');
+  }
+
+  getGenreList(): string[] {
+    if (!this.details) return [];
+    return this.details.Genre.split(', ');
+  }
+
+  getActorList(): string[] {
+    if (!this.details) return [];
+    return this.details.Actors.split(', ');
+  }
+}
+```
+
+**Example Response:**
+
+```json
+{
+  "Title": "Inception",
+  "Year": "2010",
+  "Rated": "PG-13",
+  "Released": "16 Jul 2010",
+  "Runtime": "148 min",
+  "Genre": "Action, Adventure, Sci-Fi",
+  "Director": "Christopher Nolan",
+  "Writer": "Christopher Nolan",
+  "Actors": "Leonardo DiCaprio, Joseph Gordon-Levitt, Elliot Page",
+  "Plot": "A thief who steals corporate secrets through the use of dream-sharing technology is given the inverse task of planting an idea into the mind of a C.E.O.",
+  "Language": "English, Japanese, French",
+  "Country": "United States, United Kingdom",
+  "Awards": "Won 4 Oscars. 157 wins & 220 nominations total",
+  "Poster": "https://m.media-amazon.com/images/M/MV5BMjAxMzY3NjcxNF5BMl5BanBnXkFtZTcwNTI5OTM0Mw@@._V1_SX300.jpg",
+  "Ratings": [
+    {
+      "Source": "Internet Movie Database",
+      "Value": "8.8/10"
+    },
+    {
+      "Source": "Rotten Tomatoes",
+      "Value": "87%"
+    },
+    {
+      "Source": "Metacritic",
+      "Value": "74/100"
+    }
+  ],
+  "Metascore": "74",
+  "imdbRating": "8.8",
+  "imdbVotes": "2,341,678",
+  "imdbID": "tt1375666",
+  "Type": "movie",
+  "Response": "True",
+  "youtubeURLTrailer": "https://www.youtube.com/watch?v=YoHD9XEInc0"
+}
+```
+
+**Displaying Ratings:**
+
+```typescript
+function displayRatings(details: OmdbDetails): void {
+  console.log('Ratings:');
+  
+  details.Ratings.forEach(rating => {
+    console.log(`  ${rating.Source}: ${rating.Value}`);
+  });
+  
+  // IMDb specific
+  console.log(`\nIMDb: ${details.imdbRating}/10 (${details.imdbVotes} votes)`);
+  
+  // Metacritic
+  if (details.Metascore !== 'N/A') {
+    console.log(`Metacritic: ${details.Metascore}/100`);
+  }
+}
+```
+
+**Handling TV Series:**
+
+```typescript
+function isSeriesWithSeasons(details: OmdbDetails): boolean {
+  return details.Type === 'series' && details.totalSeasons !== undefined;
+}
+
+omdbService.getMediaItemInfo('tt0944947').subscribe(details => {
+  // Game of Thrones
+  if (isSeriesWithSeasons(details)) {
+    console.log(`${details.Title} has ${details.totalSeasons} seasons`);
+  }
+});
+```
+
+## Helper Functions
+
+```typescript
+// Check if OmdbResponse has results
+function hasResults(response: OmdbResponse): boolean {
+  return response.Response === 'True' && 
+         response.Search !== undefined && 
+         response.Search.length > 0;
+}
+
+// Get error message from OmdbResponse
+function getErrorMessage(response: OmdbResponse): string {
+  return response.Response === 'False' ? (response.Error || 'Unknown error') : '';
+}
+
+// Parse total results for pagination
+function getTotalResults(response: OmdbResponse): number {
+  return response.Response === 'True' ? parseInt(response.totalResults || '0') : 0;
+}
+
+// Format IMDb rating for display
+function formatRating(details: OmdbDetails): string {
+  const rating = parseFloat(details.imdbRating);
+  return isNaN(rating) ? 'N/A' : `${rating.toFixed(1)}/10`;
+}
+
+// Get YouTube embed URL
+function getYouTubeEmbedUrl(details: OmdbDetails): string {
+  const videoId = details.youtubeURLTrailer.split('v=')[1];
+  return `https://www.youtube.com/embed/${videoId}`;
+}
+```
+
+## Related
+
+- [OmdbService](/api/services/omdb-service) - Fetches OMDB API data
+- [MediaItem Model](/api/models/media-item) - Simplified media item structure
+- [FavoritesService](/api/services/favorites-service) - Save search results as favorites

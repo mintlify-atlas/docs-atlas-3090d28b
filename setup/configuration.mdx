@@ -1,0 +1,593 @@
+---
+title: 'Configuration'
+description: 'Configure API endpoints, environments, and application settings'
+icon: 'sliders'
+---
+
+## Overview
+
+ScreenPulse uses Angular's environment system for configuration management. This guide explains how to configure API endpoints, switch between development and production environments, and customize application settings.
+
+## Environment Files
+
+ScreenPulse uses TypeScript-based environment files located in `src/environments/`:
+
+```
+src/environments/
+├── environment.development.ts  # Local development settings
+├── environment.production.ts   # Production deployment settings
+└── environment.ts             # Default/fallback settings
+```
+
+<Note>
+  Angular automatically selects the appropriate environment file based on your build configuration. You never need to manually change imports.
+</Note>
+
+## Development Configuration
+
+### Local Development Setup
+
+**File:** `src/environments/environment.development.ts`
+
+This configuration is used when running `ng serve` or `npm start`:
+
+```typescript environment.development.ts
+export const environment = {
+  serverFavoritesURL: 'http://localhost:9000/api/favorites',
+  serverSearchURL: 'http://localhost:9000/api/omdb',
+  serverUserURL: 'http://localhost:9000/api/user'
+};
+```
+
+### Configuration Properties
+
+<ParamField path="serverFavoritesURL" type="string" required>
+  Base URL for favorites management API endpoints.
+
+  **Development:** `http://localhost:9000/api/favorites`
+  
+  **Endpoints:**
+  - `GET /` - Fetch user's favorite items
+  - `POST /` - Add new favorite
+  - `DELETE /:id` - Remove favorite
+  - `PATCH /:id` - Update favorite notes/reviews
+</ParamField>
+
+<ParamField path="serverSearchURL" type="string" required>
+  Base URL for OMDB search API proxy.
+
+  **Development:** `http://localhost:9000/api/omdb`
+  
+  **Endpoints:**
+  - `GET /search?title={query}&type={type}&year={year}` - Search media
+  - `GET /details?id={imdbID}` - Get detailed information
+</ParamField>
+
+<ParamField path="serverUserURL" type="string" required>
+  Base URL for user authentication API endpoints.
+
+  **Development:** `http://localhost:9000/api/user`
+  
+  **Endpoints:**
+  - `POST /register` - User registration
+  - `POST /login` - User authentication (returns JWT)
+  - `GET /profile` - Get user profile
+  - `PUT /profile` - Update user profile
+</ParamField>
+
+## Production Configuration
+
+**File:** `src/environments/environments.production.ts`
+
+This configuration is used when building for production:
+
+```typescript environments.production.ts
+export const environment = {
+  serverFavoritesURL: 'https://screenpulse-api.onrender.com/api/favorites',
+  serverSearchURL: 'https://screenpulse-api.onrender.com/api/omdb',
+  serverUserURL: 'https://screenpulse-api.onrender.com/api/user'
+};
+```
+
+<Warning>
+  The production environment points to the hosted backend API on Render. Ensure this API is accessible and properly configured before deploying.
+</Warning>
+
+## Using Environment Variables
+
+### In Angular Services
+
+Import and use environment variables in your services:
+
+```typescript user.service.ts
+import { Injectable } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { environment } from '../environments/environment.development';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class UserService {
+  private apiUrl = environment.serverUserURL;
+
+  constructor(private http: HttpClient) {}
+
+  login(credentials: { email: string; password: string }) {
+    return this.http.post(`${this.apiUrl}/login`, credentials);
+  }
+
+  register(userData: any) {
+    return this.http.post(`${this.apiUrl}/register`, userData);
+  }
+}
+```
+
+### In Angular Components
+
+You can also access environment variables in components:
+
+```typescript app.component.ts
+import { Component } from '@angular/core';
+import { environment } from '../environments/environment.development';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html'
+})
+export class AppComponent {
+  apiBaseUrl = environment.serverSearchURL;
+
+  constructor() {
+    console.log('Using API:', this.apiBaseUrl);
+  }
+}
+```
+
+<Tip>
+  Always import from `environment.development` in your code. Angular's build system automatically replaces it with the correct environment file based on your build configuration.
+</Tip>
+
+## Switching Between Environments
+
+### Development Mode
+
+Run the application in development mode:
+
+<CodeGroup>
+  ```bash npm
+  npm start
+  ```
+
+  ```bash Angular CLI
+  ng serve
+  ```
+
+  ```bash Explicit Configuration
+  ng serve --configuration development
+  ```
+</CodeGroup>
+
+This uses `environment.development.ts` and connects to `localhost:9000`.
+
+### Production Mode
+
+Build the application for production:
+
+<CodeGroup>
+  ```bash npm
+  npm run build
+  ```
+
+  ```bash Angular CLI
+  ng build
+  ```
+
+  ```bash Explicit Configuration
+  ng build --configuration production
+  ```
+</CodeGroup>
+
+This uses `environments.production.ts` and connects to the hosted backend API.
+
+### Preview Production Build
+
+To test the production build locally:
+
+```bash
+# Build for production
+npm run build
+
+# Serve the production build
+npx http-server dist/controlli-challenge -p 8080
+
+# Open http://localhost:8080
+```
+
+<Warning>
+  When testing production builds locally, the app will connect to the production API at `screenpulse-api.onrender.com`, not your local backend.
+</Warning>
+
+## Angular Build Configuration
+
+ScreenPulse's build configuration is defined in `angular.json`:
+
+```json angular.json
+{
+  "projects": {
+    "controlli-challenge": {
+      "architect": {
+        "build": {
+          "configurations": {
+            "production": {
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.development.ts",
+                  "with": "src/environments/environments.production.ts"
+                }
+              ],
+              "outputHashing": "all",
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "2mb",
+                  "maximumError": "3mb"
+                }
+              ]
+            },
+            "development": {
+              "buildOptimizer": false,
+              "optimization": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.development.ts"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+### Key Build Settings
+
+<AccordionGroup>
+  <Accordion title="File Replacements">
+    Angular automatically swaps environment files during build:
+
+    - **Development:** Uses `environment.development.ts`
+    - **Production:** Uses `environments.production.ts`
+
+    This happens at build time, so the correct URLs are hard-coded into the bundle.
+  </Accordion>
+
+  <Accordion title="Build Optimization">
+    **Production builds include:**
+    - Ahead-of-Time (AOT) compilation
+    - Build optimizer
+    - Minification
+    - Tree-shaking
+    - Output hashing for cache busting
+
+    **Development builds include:**
+    - Just-in-Time (JIT) compilation
+    - Source maps for debugging
+    - Named chunks for easier debugging
+    - No optimization (faster rebuilds)
+  </Accordion>
+
+  <Accordion title="Build Budgets">
+    ScreenPulse enforces bundle size limits:
+
+    ```json
+    "budgets": [
+      {
+        "type": "initial",
+        "maximumWarning": "2mb",
+        "maximumError": "3mb"
+      },
+      {
+        "type": "anyComponentStyle",
+        "maximumWarning": "2kb",
+        "maximumError": "4kb"
+      }
+    ]
+    ```
+
+    If your bundle exceeds these limits, the build will warn or fail.
+  </Accordion>
+</AccordionGroup>
+
+## Running Local Backend
+
+To develop with a local backend API:
+
+<Steps>
+  <Step title="Clone Backend Repository">
+    ```bash
+    git clone https://github.com/EduGese/ScreenPulse-backend-Api.git
+    cd ScreenPulse-backend-Api
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    ```bash
+    npm install
+    ```
+  </Step>
+
+  <Step title="Configure Backend">
+    Create a `.env` file in the backend project:
+
+    ```bash .env
+    PORT=9000
+    MONGODB_URI=your_mongodb_connection_string
+    JWT_SECRET=your_jwt_secret_key
+    OMDB_API_KEY=your_omdb_api_key
+    ```
+
+    <Note>
+      Get an OMDB API key from [omdbapi.com](https://www.omdbapi.com/apikey.aspx)
+    </Note>
+  </Step>
+
+  <Step title="Start Backend Server">
+    ```bash
+    npm start
+    ```
+
+    The backend will run on `http://localhost:9000`
+  </Step>
+
+  <Step title="Update Frontend Configuration">
+    Ensure `environment.development.ts` points to `localhost:9000`:
+
+    ```typescript
+    export const environment = {
+      serverFavoritesURL: 'http://localhost:9000/api/favorites',
+      serverSearchURL: 'http://localhost:9000/api/omdb',
+      serverUserURL: 'http://localhost:9000/api/user'
+    };
+    ```
+  </Step>
+
+  <Step title="Start Frontend">
+    ```bash
+    npm start
+    ```
+
+    Now the frontend at `localhost:4200` connects to your local backend at `localhost:9000`.
+  </Step>
+</Steps>
+
+## Custom Environment Configuration
+
+You can create additional environment configurations for staging, testing, etc.
+
+### Create Staging Environment
+
+<Steps>
+  <Step title="Create Environment File">
+    Create `src/environments/environment.staging.ts`:
+
+    ```typescript environment.staging.ts
+    export const environment = {
+      serverFavoritesURL: 'https://staging-api.screenpulse.com/api/favorites',
+      serverSearchURL: 'https://staging-api.screenpulse.com/api/omdb',
+      serverUserURL: 'https://staging-api.screenpulse.com/api/user'
+    };
+    ```
+  </Step>
+
+  <Step title="Update angular.json">
+    Add staging configuration to `angular.json`:
+
+    ```json
+    "configurations": {
+      "production": { /* existing config */ },
+      "development": { /* existing config */ },
+      "staging": {
+        "fileReplacements": [
+          {
+            "replace": "src/environments/environment.development.ts",
+            "with": "src/environments/environment.staging.ts"
+          }
+        ],
+        "optimization": true,
+        "outputHashing": "all",
+        "sourceMap": false
+      }
+    }
+    ```
+  </Step>
+
+  <Step title="Build for Staging">
+    ```bash
+    ng build --configuration staging
+    ```
+  </Step>
+</Steps>
+
+## CORS Configuration
+
+If you encounter CORS issues during development:
+
+### Using Angular Proxy
+
+Create `proxy.conf.json` in the project root:
+
+```json proxy.conf.json
+{
+  "/api": {
+    "target": "http://localhost:9000",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  }
+}
+```
+
+Update `package.json`:
+
+```json package.json
+{
+  "scripts": {
+    "start": "ng serve --proxy-config proxy.conf.json"
+  }
+}
+```
+
+Then update your environment to use relative URLs:
+
+```typescript environment.development.ts
+export const environment = {
+  serverFavoritesURL: '/api/favorites',
+  serverSearchURL: '/api/omdb',
+  serverUserURL: '/api/user'
+};
+```
+
+<Tip>
+  The proxy rewrites `/api/*` requests to `http://localhost:9000/api/*`, bypassing CORS restrictions during development.
+</Tip>
+
+## Environment Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Never Commit Secrets" icon="lock">
+    Environment files are committed to Git. Never store:
+    - API keys
+    - Database passwords
+    - JWT secrets
+    - Private credentials
+
+    Use the backend `.env` file for secrets.
+  </Card>
+
+  <Card title="Keep URLs DRY" icon="code">
+    Define base URLs once in environment files:
+
+    ```typescript
+    // Good
+    const url = `${environment.serverUserURL}/login`;
+
+    // Bad
+    const url = 'http://localhost:9000/api/user/login';
+    ```
+  </Card>
+
+  <Card title="Test Both Environments" icon="flask">
+    Always test:
+    1. Development mode (`ng serve`)
+    2. Production build (`ng build && serve`)
+
+    Ensure both connect to the correct APIs.
+  </Card>
+
+  <Card title="Document API Changes" icon="book">
+    When backend APIs change:
+    1. Update environment URLs
+    2. Update service code
+    3. Update API documentation
+    4. Test all affected features
+  </Card>
+</CardGroup>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Wrong environment file is being used">
+    **Problem:** Changes to environment file don't appear in the app.
+
+    **Solution:**
+
+    1. Stop the dev server (Ctrl+C)
+    2. Clear Angular cache:
+    ```bash
+    rm -rf .angular
+    ```
+    3. Restart the dev server:
+    ```bash
+    npm start
+    ```
+
+    4. Hard refresh the browser (Ctrl+Shift+R)
+  </Accordion>
+
+  <Accordion title="API requests failing with CORS errors">
+    **Problem:** Browser blocks API requests due to CORS policy.
+
+    **Solution:**
+
+    **Option 1: Configure backend CORS (recommended)**
+    ```javascript
+    // In backend server.js or app.js
+    const cors = require('cors');
+    app.use(cors({
+      origin: 'http://localhost:4200',
+      credentials: true
+    }));
+    ```
+
+    **Option 2: Use Angular proxy**
+    See [CORS Configuration](#cors-configuration) above.
+  </Accordion>
+
+  <Accordion title="Environment changes not reflected in build">
+    **Problem:** Production build still uses old environment values.
+
+    **Solution:**
+
+    1. Delete the dist folder:
+    ```bash
+    rm -rf dist
+    ```
+
+    2. Rebuild:
+    ```bash
+    ng build --configuration production
+    ```
+
+    3. Verify the correct environment file is being used:
+    ```bash
+    # Check build output
+    cat dist/controlli-challenge/main.*.js | grep -o 'screenpulse-api.onrender.com'
+    ```
+  </Accordion>
+
+  <Accordion title="Can't connect to local backend">
+    **Problem:** Frontend can't connect to backend at localhost:9000.
+
+    **Solution:**
+
+    1. Verify backend is running:
+    ```bash
+    curl http://localhost:9000/api/user
+    ```
+
+    2. Check backend logs for errors
+
+    3. Ensure `environment.development.ts` has correct URL:
+    ```typescript
+    serverUserURL: 'http://localhost:9000/api/user'
+    ```
+
+    4. Check browser console for error details
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Development Workflow" icon="code" href="/setup/development">
+    Learn about npm scripts, hot reload, and Storybook
+  </Card>
+  
+  <Card title="Architecture Overview" icon="sitemap" href="/concepts/architecture">
+    Understand how ScreenPulse is structured
+  </Card>
+</CardGroup>

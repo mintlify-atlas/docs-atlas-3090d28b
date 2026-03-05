@@ -1,0 +1,505 @@
+---
+title: 'Environment Setup'
+description: 'Configure your development environment for ScreenPulse'
+icon: 'gear'
+---
+
+## Overview
+
+This guide walks you through setting up a complete development environment for ScreenPulse, including Node.js, Angular CLI, IDE configuration, and recommended tools.
+
+## Node.js Setup
+
+ScreenPulse requires Node.js v18.19.1 (LTS) for optimal compatibility with Angular 16.2.12.
+
+### Install Node.js
+
+<Tabs>
+  <Tab title="Using Official Installer">
+    1. Download Node.js v18.19.1 LTS from [nodejs.org](https://nodejs.org/)
+    2. Run the installer for your operating system
+    3. Verify installation:
+
+    ```bash
+    node --version  # Should show v18.19.1 or higher
+    npm --version   # Should show v8.0.0 or higher
+    ```
+  </Tab>
+
+  <Tab title="Using nvm (Recommended)">
+    Node Version Manager (nvm) allows you to easily switch between Node.js versions.
+
+    **On Linux/Mac:**
+    ```bash
+    # Install nvm
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+
+    # Reload shell
+    source ~/.bashrc  # or ~/.zshrc
+
+    # Install Node.js 18.19.1
+    nvm install 18.19.1
+    nvm use 18.19.1
+    nvm alias default 18.19.1
+    ```
+
+    **On Windows:**
+    ```bash
+    # Download and install nvm-windows from:
+    # https://github.com/coreybutler/nvm-windows/releases
+
+    # Then install Node.js
+    nvm install 18.19.1
+    nvm use 18.19.1
+    ```
+
+    Verify installation:
+    ```bash
+    node --version
+    npm --version
+    ```
+  </Tab>
+
+  <Tab title="Using Homebrew (Mac)">
+    ```bash
+    # Install Node.js 18
+    brew install node@18
+
+    # Link the installed version
+    brew link --overwrite node@18
+
+    # Verify installation
+    node --version
+    npm --version
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  Always use Node.js LTS versions for production applications. Avoid using odd-numbered versions (17, 19, 21, etc.) as they are not long-term support releases.
+</Warning>
+
+### Configure npm
+
+Optimize npm for better performance and security:
+
+```bash
+# Set up global packages directory (avoids permission issues)
+mkdir ~/.npm-global
+npm config set prefix '~/.npm-global'
+
+# Add to PATH (add to ~/.bashrc or ~/.zshrc)
+export PATH=~/.npm-global/bin:$PATH
+
+# Configure npm settings
+npm config set save-exact true        # Use exact versions
+npm config set engine-strict true     # Enforce engine requirements
+```
+
+<Tip>
+  Using exact versions in package.json ensures consistent builds across different environments.
+</Tip>
+
+## Angular CLI Setup
+
+ScreenPulse uses Angular CLI v16.2.16 for development and build tasks.
+
+### Install Angular CLI
+
+Install Angular CLI globally:
+
+<CodeGroup>
+  ```bash npm
+  npm install -g @angular/cli@16.2.16
+  ```
+
+  ```bash yarn
+  yarn global add @angular/cli@16.2.16
+  ```
+
+  ```bash pnpm
+  pnpm add -g @angular/cli@16.2.16
+  ```
+</CodeGroup>
+
+Verify installation:
+
+```bash
+ng version
+```
+
+You should see output similar to:
+
+```
+Angular CLI: 16.2.16
+Node: 18.19.1
+Package Manager: npm 8.19.3
+OS: linux x64
+```
+
+### Angular CLI Configuration
+
+Configure Angular CLI for optimal development experience:
+
+```bash
+# Disable analytics (optional)
+ng analytics off
+
+# Enable CLI autocompletion (bash/zsh)
+ng completion
+
+# Set default package manager
+ng config -g cli.packageManager npm
+```
+
+<Note>
+  ScreenPulse's `angular.json` is already configured with optimal build settings. You don't need to modify it for basic development.
+</Note>
+
+## IDE Setup
+
+### Visual Studio Code (Recommended)
+
+VS Code is the recommended editor for Angular development.
+
+#### Install VS Code
+
+Download from [code.visualstudio.com](https://code.visualstudio.com/)
+
+#### Essential Extensions
+
+ScreenPulse's `.vscode/extensions.json` recommends the following extension:
+
+```json
+{
+  "recommendations": [
+    "angular.ng-template"
+  ]
+}
+```
+
+Install additional recommended extensions:
+
+<Steps>
+  <Step title="Angular Language Service">
+    **Extension ID:** `angular.ng-template`
+
+    Provides:
+    - IntelliSense for Angular templates
+    - Error checking in HTML templates
+    - Go to definition for components and directives
+    - Auto-completion for Angular syntax
+
+    ```bash
+    code --install-extension angular.ng-template
+    ```
+  </Step>
+
+  <Step title="ESLint">
+    **Extension ID:** `dbaeumer.vscode-eslint`
+
+    Integrates ESLint into VS Code for real-time linting.
+
+    ```bash
+    code --install-extension dbaeumer.vscode-eslint
+    ```
+  </Step>
+
+  <Step title="TypeScript Importer">
+    **Extension ID:** `pmneo.tsimporter`
+
+    Auto-imports TypeScript modules.
+
+    ```bash
+    code --install-extension pmneo.tsimporter
+    ```
+  </Step>
+
+  <Step title="Prettier">
+    **Extension ID:** `esbenp.prettier-vscode`
+
+    Code formatter for consistent styling.
+
+    ```bash
+    code --install-extension esbenp.prettier-vscode
+    ```
+  </Step>
+
+  <Step title="Angular Snippets">
+    **Extension ID:** `johnpapa.angular2`
+
+    Code snippets for Angular development.
+
+    ```bash
+    code --install-extension johnpapa.angular2
+    ```
+  </Step>
+</Steps>
+
+#### VS Code Settings
+
+Create or update `.vscode/settings.json` in your project:
+
+```json
+{
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true,
+  "[typescript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[html]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[scss]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+}
+```
+
+### Other IDEs
+
+<AccordionGroup>
+  <Accordion title="WebStorm / IntelliJ IDEA">
+    JetBrains IDEs have built-in Angular support:
+
+    1. Install from [jetbrains.com](https://www.jetbrains.com/)
+    2. Open ScreenPulse project
+    3. Enable Angular plugin (usually enabled by default)
+    4. Configure TypeScript version: Settings → Languages & Frameworks → TypeScript → Use project TypeScript
+  </Accordion>
+
+  <Accordion title="Vim / Neovim">
+    For Vim users:
+
+    1. Install [coc.nvim](https://github.com/neoclide/coc.nvim)
+    2. Install coc-angular:
+    ```vim
+    :CocInstall coc-angular coc-tsserver coc-html coc-css
+    ```
+    3. Configure coc-settings.json for Angular support
+  </Accordion>
+</AccordionGroup>
+
+## Git Configuration
+
+Configure Git for contributing to ScreenPulse:
+
+```bash
+# Set your identity
+git config --global user.name "Your Name"
+git config --global user.email "your.email@example.com"
+
+# Set default branch name
+git config --global init.defaultBranch main
+
+# Enable color output
+git config --global color.ui auto
+
+# Set default editor
+git config --global core.editor "code --wait"  # VS Code
+
+# Configure line endings
+# On Windows:
+git config --global core.autocrlf true
+# On Mac/Linux:
+git config --global core.autocrlf input
+```
+
+<Tip>
+  Use `git config --list` to view all your Git configuration settings.
+</Tip>
+
+## Environment Variables Overview
+
+ScreenPulse uses TypeScript environment files instead of `.env` files. These are located in `src/environments/`:
+
+### Development Environment
+
+**File:** `src/environments/environment.development.ts`
+
+```typescript
+export const environment = {
+  serverFavoritesURL: 'http://localhost:9000/api/favorites',
+  serverSearchURL: 'http://localhost:9000/api/omdb',
+  serverUserURL: 'http://localhost:9000/api/user'
+};
+```
+
+Used when running:
+```bash
+ng serve  # Development mode by default
+```
+
+### Production Environment
+
+**File:** `src/environments/environments.production.ts`
+
+```typescript
+export const environment = {
+  serverFavoritesURL: 'https://screenpulse-api.onrender.com/api/favorites',
+  serverSearchURL: 'https://screenpulse-api.onrender.com/api/omdb',
+  serverUserURL: 'https://screenpulse-api.onrender.com/api/user'
+};
+```
+
+Used when building for production:
+```bash
+ng build --configuration production
+```
+
+<Note>
+  Angular automatically switches between environment files based on the build configuration. You don't need to manually change imports.
+</Note>
+
+### Accessing Environment Variables
+
+In your Angular components or services:
+
+```typescript
+import { environment } from '../environments/environment.development';
+
+// Use the environment variables
+const apiUrl = environment.serverSearchURL;
+```
+
+Learn more in the [Configuration Guide](/setup/configuration).
+
+## Browser DevTools
+
+### Install Browser Extensions
+
+<CardGroup cols={2}>
+  <Card title="Angular DevTools" icon="chrome">
+    **Chrome:** [Install from Chrome Web Store](https://chrome.google.com/webstore/detail/angular-devtools/ienfalfjdbdpebioblfackkekamfmbnh)
+
+    **Firefox:** [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/angular-devtools/)
+
+    Features:
+    - Component tree inspector
+    - Change detection profiler
+    - Injector hierarchy viewer
+    - Router debugging
+  </Card>
+
+  <Card title="Redux DevTools" icon="chrome">
+    Useful if you add NgRx or other state management:
+
+    **Chrome:** [Install from Chrome Web Store](https://chrome.google.com/webstore/detail/redux-devtools/lmhkpmbekcpmknklioeibfkpmmfibljd)
+
+    **Firefox:** [Install from Firefox Add-ons](https://addons.mozilla.org/en-US/firefox/addon/reduxdevtools/)
+  </Card>
+</CardGroup>
+
+## Additional Development Tools
+
+### Package Managers
+
+While npm comes with Node.js, you may prefer alternatives:
+
+<Tabs>
+  <Tab title="npm (Default)">
+    ```bash
+    # Already installed with Node.js
+    npm --version
+
+    # Update npm
+    npm install -g npm@latest
+    ```
+  </Tab>
+
+  <Tab title="Yarn">
+    ```bash
+    # Install Yarn
+    npm install -g yarn
+
+    # Verify installation
+    yarn --version
+
+    # Use with ScreenPulse
+    yarn install
+    yarn start
+    ```
+  </Tab>
+
+  <Tab title="pnpm">
+    ```bash
+    # Install pnpm
+    npm install -g pnpm
+
+    # Verify installation
+    pnpm --version
+
+    # Use with ScreenPulse
+    pnpm install
+    pnpm start
+    ```
+  </Tab>
+</Tabs>
+
+### Useful Global Tools
+
+```bash
+# TypeScript compiler (optional - included in project)
+npm install -g typescript
+
+# JSON Server (for mocking APIs)
+npm install -g json-server
+
+# HTTP Server (for serving static files)
+npm install -g http-server
+
+# Lighthouse (for performance auditing)
+npm install -g lighthouse
+```
+
+## Verify Setup
+
+Ensure everything is configured correctly:
+
+<Steps>
+  <Step title="Check Node.js">
+    ```bash
+    node --version  # v18.19.1 or higher
+    npm --version   # v8.0.0 or higher
+    ```
+  </Step>
+
+  <Step title="Check Angular CLI">
+    ```bash
+    ng version  # Should show Angular CLI 16.2.16
+    ```
+  </Step>
+
+  <Step title="Check Git">
+    ```bash
+    git --version
+    git config --list  # Verify your settings
+    ```
+  </Step>
+
+  <Step title="Test Project">
+    ```bash
+    cd ScreenPulse-frontApp
+    npm install
+    npm start
+    ```
+
+    Open http://localhost:4200/ - the app should load successfully.
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Configuration" icon="sliders" href="/setup/configuration">
+    Learn how to configure API endpoints and environments
+  </Card>
+  
+  <Card title="Development Workflow" icon="code" href="/setup/development">
+    Master the ScreenPulse development process
+  </Card>
+</CardGroup>

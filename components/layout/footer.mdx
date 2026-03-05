@@ -1,0 +1,63 @@
+---
+title: 'Footer'
+description: 'Application footer displaying branding and copyright information'
+icon: 'square-minus'
+---
+
+## Overview
+
+The Footer component is a simple presentational component that displays the ScreenPulse branding and copyright symbol at the bottom of the application.
+
+**Location**: `src/app/layout/footer/footer.component.ts`
+
+## Component Structure
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    @Component({
+      selector: 'app-footer',
+      templateUrl: './footer.component.html',
+      styleUrls: ['./footer.component.scss']
+    })
+    export class FooterComponent {}
+    ```
+  </Tab>
+  <Tab title="Template">
+    ```html
+    <div class="footer">
+      <div class="text-container">
+        <span class="text">ScreenPulse</span>
+        <mat-icon>copyright</mat-icon>
+      </div>
+    </div>
+    ```
+  </Tab>
+</Tabs>
+
+## Features
+
+- **Static Content**: Pure presentational component with no inputs or outputs
+- **Minimal Design**: Clean footer with branding and copyright icon
+- **Material Icons**: Uses Angular Material copyright icon
+
+## Usage
+
+The footer is typically placed in the main application layout:
+
+```html
+<app-navbar></app-navbar>
+<router-outlet></router-outlet>
+<app-footer></app-footer>
+```
+
+## Content
+
+The footer displays:
+
+- **Brand Name**: "ScreenPulse" text
+- **Copyright Icon**: Material Design copyright symbol
+
+## Styling
+
+The component uses scoped styles defined in `footer.component.scss` to position and style the footer content consistently across all pages.

@@ -1,0 +1,370 @@
+---
+title: 'Authentication'
+description: 'Complete guide to implementing authentication with JWT tokens, session storage, and route protection'
+icon: 'shield-check'
+---
+
+## Overview
+
+ScreenPulse uses JWT-based authentication with session storage for user management. The authentication system includes login/registration flows, token management, and route guards to protect sensitive pages.
+
+## Key Components
+
+- **AuthService** (`src/app/core/services/auth.service.ts`) - Manages authentication state and session storage
+- **UserService** (`src/app/core/services/user.service.ts`) - Handles API calls for login and registration
+- **AuthGuard** (`src/app/core/guards/auth.guard.ts`) - Protects routes requiring authentication
+- **AuthFormComponent** (`src/app/pages/auth/components/auth-form/auth-form.component.ts`) - Reusable login/register form
+
+## Authentication Flow
+
+<Steps>
+  <Step title="User submits credentials">
+    The user enters their credentials in the `AuthFormComponent`, which validates the form using Angular's reactive forms with validation rules:
+    
+    ```typescript src/app/pages/auth/components/auth-form/auth-form.component.ts
+    private passwordPattern = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
+
+    private buildForm(): void {
+      const controls: Partial<Record<string, unknown>> = {
+        email: ['', [Validators.required, Validators.email]],
+        password: ['', [
+          Validators.required,
+          Validators.pattern(this.passwordPattern)
+        ]]
+      };
+
+      if (this.showNameField) {
+        controls['name'] = ['', Validators.required];
+      }
+
+      this.form = this.fb.group(controls);
+    }
+    ```
+    
+    **Password requirements:**
+    - At least 6 characters
+    - Contains at least one letter
+    - Contains at least one number
+    - Contains at least one special character
+  </Step>
+
+  <Step title="API authentication request">
+    The `UserService` sends credentials to the backend API:
+    
+    ```typescript src/app/core/services/user.service.ts
+    login(formData: User): Observable<LoginResponse> {
+      const body = formData;
+      const httpOptions = {
+        headers: new HttpHeaders({
+          'Content-Type': 'application/json',
+        }),
+      };
+      return this.http.post<LoginResponse>(`${this.baseUrl}/login`, body, httpOptions)
+    }
+
+    register(formData: User): Observable<User> {
+      const body = formData;
+      const httpOptions = {
+        headers: new HttpHeaders({
+          'Content-Type': 'application/json',
+        }),
+      };
+      return this.http.post<RegisterResponse>(`${this.baseUrl}/register`, body, httpOptions)
+    }
+    ```
+  </Step>
+
+  <Step title="Store session data">
+    Upon successful authentication, the `AuthService` stores the JWT token and user information in session storage:
+    
+    ```typescript src/app/core/services/auth.service.ts
+    setUserSession(user: AuthUser, token: string) {
+      this.setAuthToken(token);
+      this.setUserMail(user.email);
+      this.setUserName(user.name);
+    }
+
+    setAuthToken(token: string) {
+      sessionStorage.setItem(this.authTokenKey, token);
+      this.userLoggedInSubject.next(true);
+    }
+
+    setUserMail(userMail: string) {
+      sessionStorage.setItem(this.userMailKey, userMail);
+      this.userMailSubject.next(userMail);
+    }
+
+    setUserName(userName: string) {
+      sessionStorage.setItem(this.userNameKey, userName);
+    }
+    ```
+    
+    <Note>
+      Session storage is used instead of local storage, meaning the session ends when the browser tab is closed.
+    </Note>
+  </Step>
+
+  <Step title="Navigate to application">
+    After successful authentication, the user is redirected to the home page:
+    
+    ```typescript src/app/pages/auth/page/auth-page.component.ts
+    private handleLogin(formData: User): void {
+      this.isAuthenticating = true;
+      this.userService.login(formData)
+      .pipe(
+        finalize(()=>{
+          this.isAuthenticating = false;
+        })
+      )
+      .subscribe({
+        next: (data) => {
+          this.authService.setUserSession(data.user, data.token);
+          this.toastrService.success(`Welcome, ${data.user.name}`, `You are logged in`)
+          this.router.navigate(['']);
+        },
+        error: (error) => {
+          this.toastrService.error(error.message);
+        }
+      });
+    }
+    ```
+  </Step>
+</Steps>
+
+## JWT Token Management
+
+### Getting the Auth Token
+
+The `AuthService` provides methods to retrieve the stored JWT token:
+
+```typescript src/app/core/services/auth.service.ts
+getAuthToken(): string | null {
+  return sessionStorage.getItem(this.authTokenKey);
+}
+```
+
+### Checking Authentication Status
+
+Use observables to react to authentication state changes:
+
+```typescript src/app/core/services/auth.service.ts
+private userLoggedInSubject = new BehaviorSubject<boolean>(false);
+
+isLoggedInObservable(): Observable<boolean> {
+  return this.userLoggedInSubject.asObservable();
+}
+```
+
+### Example: Checking Auth Before Action
+
+```typescript src/app/pages/search/page/search.component.ts
+addToFavorites(mediaItem: MediaItem) {
+  this.authService.isLoggedInObservable().pipe(
+    take(1),
+    switchMap(loggedIn => {
+      if (!loggedIn) {
+        this.toastrService.warning('You must be logged in to add movies to your list', 'Error');
+        this.router.navigate(['/auth/login']);
+        return EMPTY; 
+      }
+      return this.favoritesService.addToFavorites(mediaItem);
+    })
+  ).subscribe({
+    next: () => this.toastrService.success(mediaItem.title, 'Added to favorites'),
+    error: (error) => this.toastrService.warning(error.message)
+  });
+}
+```
+
+## Route Protection with AuthGuard
+
+The `AuthGuard` protects routes that require authentication:
+
+```typescript src/app/core/guards/auth.guard.ts
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+
+  constructor(
+    private authService: AuthService, 
+    private router: Router, 
+    private toastService: ToastrService
+  ) { }
+
+  canActivate(): Observable<boolean> {
+    return this.authService.isLoggedInObservable().pipe(
+      take(1),
+      tap(loggedIn => {
+        if (!loggedIn) {
+          this.toastService.warning('You must be logged in to access this page.', 'Access Denied');
+          this.router.navigate(['/auth/login']);
+        }
+      })
+    );
+  }
+}
+```
+
+### Applying the Guard to Routes
+
+```typescript
+const routes: Routes = [
+  {
+    path: 'favorites',
+    component: FavoritesComponent,
+    canActivate: [AuthGuard] // Protect this route
+  }
+];
+```
+
+## Logout Flow
+
+Logging out clears all session data and updates observables:
+
+```typescript src/app/core/services/auth.service.ts
+logOut() {
+  sessionStorage.removeItem(this.authTokenKey);
+  sessionStorage.removeItem(this.userMailKey);
+  sessionStorage.removeItem(this.userNameKey);
+  sessionStorage.removeItem(this.userIdKey);
+  this.userMailSubject.next(null);
+  this.userLoggedInSubject.next(false);
+}
+```
+
+## Session Initialization
+
+The `AuthService` checks for existing sessions on initialization:
+
+```typescript src/app/core/services/auth.service.ts
+private userMailSubject = new BehaviorSubject<string | null>(null);
+private userLoggedInSubject = new BehaviorSubject<boolean>(false);
+
+constructor() {
+  this.userMailSubject.next(sessionStorage.getItem(this.userMailKey));
+  this.userLoggedInSubject.next(sessionStorage.getItem(this.authTokenKey) !== null);
+}
+```
+
+This ensures that users remain logged in when refreshing the page (until the browser tab is closed).
+
+## Form Types
+
+The `AuthFormComponent` supports both login and registration:
+
+```typescript src/app/pages/auth/components/auth-form/auth-form.component.ts
+@Input() formType: 'login' | 'register' = 'login';
+
+private configureByFormType(): void {
+  if (this.formType === 'register') {
+    this.title = 'Join us!';
+    this.submitButtonText = 'Sign Up';
+    this.showNameField = true;
+    this.showRegisterLink = false;
+    this.showPasswordHint = true;
+  } else {
+    this.title = 'Open the door';
+    this.submitButtonText = 'Login';
+    this.showNameField = false;
+    this.showRegisterLink = true;
+    this.showPasswordHint = false;
+  }
+}
+```
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="Invalid Credentials">
+    When login fails due to invalid credentials, the `ErrorInterceptor` transforms the HTTP error:
+    
+    ```typescript
+    case 401:
+      message = 'Unauthorized access. Please try it again';
+      if (error.error.code === 'AUTH_TOKEN_EXPIRED') {
+        message = 'Session expired. Please login again';
+      }
+      break;
+    ```
+    
+    The error is displayed via toast notification in the auth page component.
+  </Accordion>
+
+  <Accordion title="User Already Exists">
+    During registration, if the email is already registered:
+    
+    ```typescript
+    case 409:
+      if (error.error.code === 'USER_EXISTS') {
+        message = 'User with this email already exists';
+      }
+      break;
+    ```
+  </Accordion>
+
+  <Accordion title="Network Connection Issues">
+    If the backend server is unreachable:
+    
+    ```typescript
+    case 0:
+      message = 'Cannot connect to server. Please check your internet connection';
+      break;
+    ```
+  </Accordion>
+
+  <Accordion title="Token Expiration">
+    When a JWT token expires, the `AuthInterceptor` automatically logs out the user:
+    
+    ```typescript src/app/core/interceptors/auth.interceptor.ts
+    intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+      const token = this.authService.getAuthToken();
+      let authReq = req;
+      if (token) {
+        authReq = req.clone({
+          setHeaders: { Authorization: `Bearer ${token}` }
+        });
+      }
+      return next.handle(authReq).pipe(
+        catchError((error: HttpErrorResponse) => {
+          if (error.status === 401 && error.message === 'Session expired. Please login again') {
+            this.authService.logOut();
+            this.router.navigate(['/auth/login']);
+          }
+          return throwError(() => error);
+        })
+      );
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Observables" icon="bell">
+    Subscribe to `isLoggedInObservable()` instead of directly checking session storage to ensure reactivity across the application.
+  </Card>
+  
+  <Card title="Protect Sensitive Routes" icon="lock">
+    Always apply `AuthGuard` to routes that require authentication, such as favorites and user profile pages.
+  </Card>
+  
+  <Card title="Handle Token Expiration" icon="clock">
+    The `AuthInterceptor` automatically handles token expiration by logging out users and redirecting to login.
+  </Card>
+  
+  <Card title="Clear Session on Logout" icon="arrow-right-from-bracket">
+    Always use `authService.logOut()` to ensure all session data is properly cleared and observables are updated.
+  </Card>
+</CardGroup>
+
+## Related Files
+
+- `src/app/core/services/auth.service.ts` - Core authentication service
+- `src/app/core/services/user.service.ts` - User API service
+- `src/app/core/guards/auth.guard.ts` - Route protection guard
+- `src/app/core/interceptors/auth.interceptor.ts` - JWT token interceptor
+- `src/app/core/interceptors/error.interceptor.ts` - Error handling interceptor
+- `src/app/pages/auth/components/auth-form/auth-form.component.ts` - Authentication form component
+- `src/app/pages/auth/page/auth-page.component.ts` - Authentication page component

@@ -1,0 +1,205 @@
+---
+title: 'Trailer Dialog'
+description: 'YouTube video player dialog component'
+icon: 'video'
+---
+
+## Overview
+
+The Trailer Dialog component displays YouTube trailer videos in a full-screen Material Design dialog with an embedded iframe player. The video URL is sanitized for security and configured for autoplay.
+
+**Location**: `src/app/shared/components/trailer-dialog/trailer-dialog.component.ts`
+
+## Key Features
+
+- **YouTube Integration**: Embeds YouTube videos via iframe
+- **URL Sanitization**: Securely handles video URLs with DomSanitizer
+- **Autoplay**: Videos start automatically when dialog opens
+- **Close Button**: Overlay close button for easy dismissal
+- **Fullscreen Support**: Supports fullscreen mode
+
+## Component Structure
+
+```typescript
+@Component({
+  selector: 'app-trailer-dialog',
+  templateUrl: './trailer-dialog.component.html',
+  styleUrls: ['./trailer-dialog.component.scss']
+})
+export class TrailerDialogComponent implements OnInit {
+  safeVideoUrl!: SafeResourceUrl;
+
+  constructor(
+    @Inject(MAT_DIALOG_DATA) public data: TrailerDialogData,
+    private dialogRef: MatDialogRef<TrailerDialogComponent>,
+    private sanitizer: DomSanitizer
+  ) {}
+
+  ngOnInit(): void {
+    const videoId = this.extractYouTubeId(this.data.videoUrl);
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0`;
+    this.safeVideoUrl = this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+  }
+}
+```
+
+## Dialog Data Interface
+
+<ParamField path="data" type="TrailerDialogData">
+  Data injected via MAT_DIALOG_DATA
+</ParamField>
+
+```typescript
+interface TrailerDialogData {
+  videoUrl: string;  // YouTube video URL (watch or embed format)
+}
+```
+
+## Opening the Dialog
+
+Use the `DialogService` to open the trailer dialog:
+
+```typescript
+this.dialogService.openTrailerDialog(
+  'https://www.youtube.com/watch?v=dQw4w9WgXcQ'
+);
+```
+
+Or directly with MatDialog:
+
+```typescript
+this.dialog.open(TrailerDialogComponent, {
+  data: { videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' },
+  width: '90vw',
+  height: '90vh',
+  panelClass: 'trailer-dialog'
+});
+```
+
+## Core Methods
+
+### extractYouTubeId()
+
+Extracts the YouTube video ID from various URL formats.
+
+```typescript
+private extractYouTubeId(url: string): string {
+  const regExp = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))(\w{11})/;
+  const match = url.match(regExp);
+  return match && match[1] ? match[1] : '';
+}
+```
+
+**Supported URL formats**:
+- `https://www.youtube.com/watch?v=VIDEO_ID`
+- `https://youtu.be/VIDEO_ID`
+- `https://www.youtube.com/embed/VIDEO_ID`
+
+### close()
+
+Closes the trailer dialog.
+
+```typescript
+close(): void {
+  this.dialogRef.close();
+}
+```
+
+## Template Structure
+
+```html
+<div class="trailer-container">
+  <button class="close-button" mat-icon-button (click)="close()" aria-label="Close trailer">
+    <mat-icon>close</mat-icon>
+  </button>
+
+  <div class="video-wrapper">
+    <iframe 
+      [src]="safeVideoUrl" 
+      frameborder="0" 
+      allow="encrypted-media; fullscreen">
+    </iframe>
+  </div>
+</div>
+```
+
+## Iframe Configuration
+
+The embedded YouTube URL includes these parameters:
+
+<ParamField path="autoplay" type="1">
+  Video starts playing automatically when dialog opens
+</ParamField>
+
+<ParamField path="controls" type="1">
+  Shows YouTube player controls (play, pause, volume, etc.)
+</ParamField>
+
+<ParamField path="rel" type="0">
+  Disables related videos from other channels at the end
+</ParamField>
+
+## Example Embed URL
+
+```
+https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1&controls=1&rel=0
+```
+
+## Security
+
+The component uses Angular's `DomSanitizer` to safely embed YouTube URLs:
+
+```typescript
+this.safeVideoUrl = this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+```
+
+This prevents XSS attacks by ensuring only trusted URLs are embedded.
+
+## Styling Considerations
+
+- **Full-width video**: The iframe should fill the dialog container
+- **Aspect ratio**: Maintain 16:9 ratio for proper video display
+- **Close button**: Positioned as an overlay (typically top-right)
+- **Responsive**: Adapts to different screen sizes
+
+## User Experience
+
+1. User clicks "Watch trailer" button in movie dialog
+2. Trailer dialog opens with video loading
+3. Video begins playing automatically
+4. User can:
+   - Control playback with YouTube controls
+   - Enter fullscreen mode
+   - Close dialog with close button or backdrop click
+
+## Dependencies
+
+- **@angular/material/dialog**: Dialog infrastructure
+- **DomSanitizer**: URL sanitization for security
+- **@angular/platform-browser**: Provides SafeResourceUrl type
+
+## Common Use Cases
+
+### From Movie Dialog
+
+```typescript
+playTrailer(): void {
+  if (!this.data.response.youtubeURLTrailer) return;
+  
+  this.dialogService.openTrailerDialog(
+    this.data.response.youtubeURLTrailer
+  );
+}
+```
+
+### Standalone Usage
+
+```typescript
+openTrailer(videoUrl: string): void {
+  this.dialog.open(TrailerDialogComponent, {
+    data: { videoUrl },
+    maxWidth: '90vw',
+    maxHeight: '90vh'
+  });
+}
+```

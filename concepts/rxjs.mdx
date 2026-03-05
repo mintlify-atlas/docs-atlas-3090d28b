@@ -1,0 +1,506 @@
+---
+title: 'RxJS Patterns'
+description: 'Reactive programming with RxJS in ScreenPulse'
+---
+
+ScreenPulse uses **RxJS (Reactive Extensions for JavaScript)** to manage asynchronous data streams throughout the application. RxJS provides a powerful way to handle events, HTTP requests, and state changes using observable patterns.
+
+## What is RxJS?
+
+RxJS is a library for reactive programming using **Observables**, which represent streams of data that can emit multiple values over time.
+
+<Info>
+Think of an Observable as a "lazy Promise" that can emit multiple values. While a Promise resolves once with a single value, an Observable can emit many values over its lifetime.
+</Info>
+
+## BehaviorSubject for State Management
+
+ScreenPulse uses `BehaviorSubject` to manage application state, particularly for authentication:
+
+```typescript title="src/app/core/services/auth.service.ts"
+import { Injectable } from '@angular/core';
+import { BehaviorSubject, Observable } from 'rxjs';
+import { AuthUser } from 'src/app/shared/models/auth.model';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthService {
+  private readonly authTokenKey = 'authToken';
+  private readonly userMailKey = 'userMail';
+
+  // BehaviorSubjects hold current state and emit to new subscribers
+  private userMailSubject = new BehaviorSubject<string | null>(null);
+  private userLoggedInSubject = new BehaviorSubject<boolean>(false);
+
+  constructor() {
+    // Initialize state from sessionStorage
+    this.userMailSubject.next(sessionStorage.getItem(this.userMailKey));
+    this.userLoggedInSubject.next(
+      sessionStorage.getItem(this.authTokenKey) !== null
+    );
+  }
+
+  // Expose Observables (not Subjects) to prevent external modifications
+  isLoggedInObservable(): Observable<boolean> {
+    return this.userLoggedInSubject.asObservable();
+  }
+
+  getUserMailObservable(): Observable<string | null> {
+    return this.userMailSubject.asObservable();
+  }
+
+  // Update state by calling next()
+  setAuthToken(token: string) {
+    sessionStorage.setItem(this.authTokenKey, token);
+    this.userLoggedInSubject.next(true);
+  }
+
+  setUserMail(userMail: string) {
+    sessionStorage.setItem(this.userMailKey, userMail);
+    this.userMailSubject.next(userMail);
+  }
+
+  logOut() {
+    sessionStorage.removeItem(this.authTokenKey);
+    sessionStorage.removeItem(this.userMailKey);
+    this.userMailSubject.next(null);
+    this.userLoggedInSubject.next(false);
+  }
+}
+```
+
+### Why BehaviorSubject?
+
+<AccordionGroup>
+  <Accordion title="Holds Current Value">
+    BehaviorSubject always has a current value. New subscribers immediately receive the latest value:
+    ```typescript
+    const subject = new BehaviorSubject(false);
+    subject.next(true);
+    
+    // New subscriber gets current value (true) immediately
+    subject.subscribe(value => console.log(value)); // Logs: true
+    ```
+  </Accordion>
+  
+  <Accordion title="Multicast">
+    Multiple components can subscribe to the same BehaviorSubject and receive updates:
+    ```typescript
+    // Navbar component
+    this.authService.isLoggedInObservable().subscribe(loggedIn => {
+      this.showLoginButton = !loggedIn;
+    });
+    
+    // Auth guard
+    this.authService.isLoggedInObservable().subscribe(loggedIn => {
+      if (!loggedIn) this.router.navigate(['/auth/login']);
+    });
+    ```
+  </Accordion>
+  
+  <Accordion title="Encapsulation">
+    By exposing Observables instead of Subjects, we prevent external code from calling `next()`:
+    ```typescript
+    // Good: Only the service can modify state
+    isLoggedInObservable(): Observable<boolean> {
+      return this.userLoggedInSubject.asObservable();
+    }
+    
+    // Bad: External code could call next() and corrupt state
+    // isLoggedInSubject: BehaviorSubject<boolean>;
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Observable Streams in Components
+
+Components subscribe to observables to react to data changes:
+
+```typescript title="src/app/layout/navbar/navbar.component.ts"
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { AuthService } from 'src/app/core/services/auth.service';
+import { combineLatest, Observable } from 'rxjs';
+import { UserSessionData } from 'src/app/shared/models/user-session.model';
+
+@Component({
+  selector: 'app-navbar',
+  templateUrl: './navbar.component.html',
+  styleUrls: ['./navbar.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush
+})
+export class NavbarComponent {
+  // Combine multiple observables into a single stream
+  readonly userData$: Observable<UserSessionData> = combineLatest({
+    email: this.authService.getUserMailObservable(),
+    isLoggedIn: this.authService.isLoggedInObservable() 
+  });
+
+  constructor(
+    private authService: AuthService,
+    private router: Router
+  ) { }
+
+  logOut() {
+    this.authService.logOut();
+    this.router.navigate(['']);
+  }
+}
+```
+
+```html title="navbar.component.html"
+<!-- Use async pipe to subscribe in template -->
+<ng-container *ngIf="userData$ | async as userData">
+  <div *ngIf="userData.isLoggedIn">
+    <span>{{ userData.email }}</span>
+    <button (click)="logOut()">Log Out</button>
+  </div>
+  <div *ngIf="!userData.isLoggedIn">
+    <a routerLink="/auth/login">Login</a>
+  </div>
+</ng-container>
+```
+
+<Tip>
+The `$` suffix is a naming convention to indicate that a variable is an Observable. It's not required, but it's widely adopted in the Angular community.
+</Tip>
+
+## RxJS Operators
+
+Operators transform, filter, and combine observable streams. ScreenPulse uses several common operators:
+
+### take()
+
+Completes the observable after emitting a specified number of values:
+
+```typescript title="src/app/core/guards/auth.guard.ts"
+import { take, tap } from 'rxjs/operators';
+
+canActivate(): Observable<boolean> {
+  return this.authService.isLoggedInObservable().pipe(
+    take(1),  // Complete after first emission
+    tap(loggedIn => {
+      if (!loggedIn) {
+        this.toastService.warning(
+          'You must be logged in to access this page.',
+          'Access Denied'
+        );
+        this.router.navigate(['/auth/login']);
+      }
+    })
+  );
+}
+```
+
+<Note>
+`take(1)` is crucial in guards to prevent memory leaks. Without it, the subscription would never complete.
+</Note>
+
+### switchMap()
+
+Cancels the previous inner observable when a new value arrives:
+
+```typescript title="src/app/pages/search/page/search.component.ts"
+import { switchMap, take } from 'rxjs/operators';
+import { EMPTY } from 'rxjs';
+
+addToFavorites(mediaItem: MediaItem) {
+  this.authService.isLoggedInObservable().pipe(
+    take(1),
+    switchMap(loggedIn => {
+      if (!loggedIn) {
+        this.toastrService.warning(
+          'You must be logged in to add movies to your list',
+          'Error'
+        );
+        this.router.navigate(['/auth/login']);
+        return EMPTY;  // Return empty observable - no further processing
+      }
+      // Switch to the favorites service observable
+      return this.favoritesService.addToFavorites(mediaItem);
+    })
+  ).subscribe({
+    next: () => this.toastrService.success(mediaItem.title, 'Added to favorites'),
+    error: (error) => this.toastrService.warning(error.message)
+  });
+}
+```
+
+### tap()
+
+Performs side effects without modifying the stream:
+
+```typescript
+this.http.get('/api/movies').pipe(
+  tap(movies => console.log('Received movies:', movies)),
+  tap(() => this.loadingService.hide())
+).subscribe();
+```
+
+### finalize()
+
+Executes code when the observable completes or errors:
+
+```typescript title="src/app/pages/search/page/search.component.ts"
+import { finalize } from 'rxjs/operators';
+
+openMediaItem(mediaItem: MediaItem): void {
+  this.loadingCard = true;
+  this.dialogService
+    .openMediaItem(window.innerWidth, mediaItem, false)
+    .pipe(
+      finalize(() => (this.loadingCard = false))  // Always hide loader
+    )
+    .subscribe();
+}
+```
+
+### combineLatest()
+
+Combines multiple observables and emits when any source emits:
+
+```typescript title="src/app/layout/navbar/navbar.component.ts"
+import { combineLatest } from 'rxjs';
+
+readonly userData$ = combineLatest({
+  email: this.authService.getUserMailObservable(),
+  isLoggedIn: this.authService.isLoggedInObservable()
+});
+
+// Emits: { email: 'user@example.com', isLoggedIn: true }
+```
+
+## Subscription Management
+
+Unmanaged subscriptions can cause **memory leaks**. ScreenPulse uses several strategies to prevent this:
+
+### Strategy 1: Async Pipe (Recommended)
+
+The async pipe automatically subscribes and unsubscribes:
+
+```typescript
+export class NavbarComponent {
+  userData$ = combineLatest({
+    email: this.authService.getUserMailObservable(),
+    isLoggedIn: this.authService.isLoggedInObservable()
+  });
+}
+```
+
+```html
+<div *ngIf="userData$ | async as userData">
+  {{ userData.email }}
+</div>
+```
+
+<Tip>
+Use the async pipe whenever possible. It's the cleanest way to handle subscriptions and prevent memory leaks.
+</Tip>
+
+### Strategy 2: take() Operator
+
+For one-time operations, use `take(1)` to auto-complete:
+
+```typescript
+this.authService.isLoggedInObservable()
+  .pipe(take(1))
+  .subscribe(loggedIn => {
+    // This subscription completes automatically
+  });
+```
+
+### Strategy 3: Manual Unsubscribe
+
+For complex scenarios, store and unsubscribe manually:
+
+```typescript
+import { Subscription } from 'rxjs';
+
+export class MyComponent implements OnDestroy {
+  private subscription: Subscription;
+  
+  ngOnInit() {
+    this.subscription = this.service.getData().subscribe(data => {
+      // Handle data
+    });
+  }
+  
+  ngOnDestroy() {
+    this.subscription?.unsubscribe();
+  }
+}
+```
+
+### Strategy 4: takeUntil()
+
+Use a Subject to signal when to complete all subscriptions:
+
+```typescript
+import { Subject } from 'rxjs';
+import { takeUntil } from 'rxjs/operators';
+
+export class MyComponent implements OnDestroy {
+  private destroy$ = new Subject<void>();
+  
+  ngOnInit() {
+    this.service.getData()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(data => {
+        // Handle data
+      });
+    
+    this.service.getMoreData()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(data => {
+        // Handle more data
+      });
+  }
+  
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+}
+```
+
+## HTTP with RxJS
+
+Angular's HttpClient returns observables for HTTP operations:
+
+```typescript title="src/app/core/services/user.service.ts"
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
+import { LoginResponse, User } from 'src/app/shared/models/auth.model';
+import { environment } from 'src/environments/environment.development';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class UserService {
+  private baseUrl = environment.serverUserURL;
+
+  constructor(private http: HttpClient) { }
+
+  login(formData: User): Observable<LoginResponse> {
+    const httpOptions = {
+      headers: new HttpHeaders({
+        'Content-Type': 'application/json',
+      }),
+    };
+    return this.http.post<LoginResponse>(
+      `${this.baseUrl}/login`,
+      formData,
+      httpOptions
+    );
+  }
+
+  register(formData: User): Observable<User> {
+    const httpOptions = {
+      headers: new HttpHeaders({
+        'Content-Type': 'application/json',
+      }),
+    };
+    return this.http.post<User>(
+      `${this.baseUrl}/register`,
+      formData,
+      httpOptions
+    );
+  }
+}
+```
+
+## Common RxJS Patterns
+
+<AccordionGroup>
+  <Accordion title="Loading State">
+    ```typescript
+    isLoading$ = new BehaviorSubject<boolean>(false);
+    
+    fetchData() {
+      this.isLoading$.next(true);
+      this.http.get('/api/data')
+        .pipe(finalize(() => this.isLoading$.next(false)))
+        .subscribe();
+    }
+    ```
+  </Accordion>
+  
+  <Accordion title="Error Handling">
+    ```typescript
+    import { catchError } from 'rxjs/operators';
+    import { of } from 'rxjs';
+    
+    this.http.get('/api/data').pipe(
+      catchError(error => {
+        console.error('Error:', error);
+        return of([]);  // Return empty array as fallback
+      })
+    ).subscribe();
+    ```
+  </Accordion>
+  
+  <Accordion title="Debouncing User Input">
+    ```typescript
+    import { debounceTime, distinctUntilChanged } from 'rxjs/operators';
+    
+    searchControl.valueChanges.pipe(
+      debounceTime(300),  // Wait 300ms after user stops typing
+      distinctUntilChanged(),  // Only emit if value changed
+      switchMap(query => this.searchService.search(query))
+    ).subscribe();
+    ```
+  </Accordion>
+  
+  <Accordion title="Retry Failed Requests">
+    ```typescript
+    import { retry } from 'rxjs/operators';
+    
+    this.http.get('/api/data').pipe(
+      retry(3)  // Retry up to 3 times on failure
+    ).subscribe();
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use async pipe in templates">
+    Let Angular handle subscription lifecycle automatically
+  </Step>
+  
+  <Step title="Expose Observables, not Subjects">
+    Prevent external code from calling `next()` on your Subjects
+  </Step>
+  
+  <Step title="Always unsubscribe">
+    Use async pipe, take(1), takeUntil(), or manual unsubscribe in ngOnDestroy
+  </Step>
+  
+  <Step title="Use operators to transform data">
+    Chain operators with pipe() instead of nested subscriptions
+  </Step>
+  
+  <Step title="Handle errors gracefully">
+    Use catchError to provide fallback values and prevent stream termination
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Services" icon="gears" href="/concepts/services">
+    Learn about service architecture and dependency injection
+  </Card>
+  <Card title="Reactive Patterns" icon="diagram-project" href="/concepts/reactive-patterns">
+    Advanced reactive programming patterns
+  </Card>
+  <Card title="HTTP Interceptors" icon="filter" href="/guides/http-interceptors">
+    Intercept and transform HTTP requests
+  </Card>
+  <Card title="State Management" icon="database" href="/guides/state-management">
+    Alternative state management approaches
+  </Card>
+</CardGroup>

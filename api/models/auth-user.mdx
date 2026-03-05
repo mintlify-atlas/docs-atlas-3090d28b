@@ -1,0 +1,377 @@
+---
+title: 'Auth Models'
+description: 'Authentication-related interfaces: User, AuthUser, LoginResponse, and RegisterResponse'
+icon: 'key'
+---
+
+## Overview
+
+ScreenPulse uses several authentication-related interfaces for different purposes. These interfaces ensure type safety and proper data handling throughout the authentication flow.
+
+## Import
+
+```typescript
+import { User, AuthUser, LoginResponse, RegisterResponse } from 'src/app/shared/models/auth.model';
+```
+
+## User Interface
+
+User data for authentication requests. Includes sensitive data only needed for client operations.
+
+### Definition
+
+```typescript
+export interface User {
+  _id?: string;
+  name: string;
+  email: string;
+  password?: string;
+}
+```
+
+### Fields
+
+<ResponseField name="_id" type="string">
+  Unique identifier for the user in the database. Optional and typically not used in client requests.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The user's display name
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  The user's email address (used for login)
+</ResponseField>
+
+<ResponseField name="password" type="string">
+  The user's password. Used only for login and registration requests. Never stored in the client application or returned from the server.
+</ResponseField>
+
+### Usage
+
+**For Login:**
+
+```typescript
+const loginData: User = {
+  email: 'user@example.com',
+  password: 'securePassword123',
+  name: '' // Not required for login
+};
+
+userService.login(loginData).subscribe(response => {
+  console.log('Logged in:', response.user);
+});
+```
+
+**For Registration:**
+
+```typescript
+const registrationData: User = {
+  name: 'John Doe',
+  email: 'john@example.com',
+  password: 'securePassword123'
+};
+
+userService.register(registrationData).subscribe(response => {
+  console.log('Registered user:', response);
+});
+```
+
+---
+
+## AuthUser Interface
+
+User data returned from server. **NEVER** includes password or sensitive data. Used in all responses and throughout the app.
+
+### Definition
+
+```typescript
+export interface AuthUser {
+  _id: string;
+  email: string;
+  name: string;
+}
+```
+
+### Fields
+
+<ResponseField name="_id" type="string" required>
+  Unique identifier for the user in the database
+</ResponseField>
+
+<ResponseField name="email" type="string" required>
+  The user's email address
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  The user's display name
+</ResponseField>
+
+### Usage
+
+```typescript
+import { AuthUser } from 'src/app/shared/models/auth.model';
+import { AuthService } from 'src/app/core/services/auth.service';
+
+// After login, store the AuthUser
+const authUser: AuthUser = {
+  _id: '507f1f77bcf86cd799439011',
+  email: 'user@example.com',
+  name: 'John Doe'
+};
+
+// Store in AuthService
+authService.setUserSession(authUser, token);
+
+// Display user information
+console.log('User ID:', authUser._id);
+console.log('Email:', authUser.email);
+console.log('Name:', authUser.name);
+// Note: No password field - it's never sent to the client
+```
+
+---
+
+## LoginResponse Interface
+
+Response from login endpoint. Contains authentication token + safe user data.
+
+### Definition
+
+```typescript
+export interface LoginResponse {
+  token: string;
+  user: AuthUser;
+}
+```
+
+### Fields
+
+<ResponseField name="token" type="string" required>
+  JWT authentication token for API requests
+</ResponseField>
+
+<ResponseField name="user" type="AuthUser" required>
+  Safe user data (no password)
+</ResponseField>
+
+### Usage
+
+```typescript
+import { LoginResponse } from 'src/app/shared/models/auth.model';
+import { UserService } from 'src/app/core/services/user.service';
+import { AuthService } from 'src/app/core/services/auth.service';
+
+const credentials: User = {
+  email: 'user@example.com',
+  password: 'password123',
+  name: ''
+};
+
+userService.login(credentials).subscribe({
+  next: (response: LoginResponse) => {
+    console.log('JWT Token:', response.token);
+    console.log('User ID:', response.user._id);
+    console.log('User Email:', response.user.email);
+    console.log('User Name:', response.user.name);
+    
+    // Store the session
+    authService.setUserSession(response.user, response.token);
+  },
+  error: (error) => {
+    console.error('Login failed:', error);
+  }
+});
+```
+
+**Example Response:**
+
+```json
+{
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI1MDdmMWY3N2JjZjg2Y2Q3OTk0MzkwMTEiLCJpYXQiOjE2NzgzMjE2MDAsImV4cCI6MTY3ODMyNTIwMH0.abc123def456",
+  "user": {
+    "_id": "507f1f77bcf86cd799439011",
+    "email": "user@example.com",
+    "name": "John Doe"
+  }
+}
+```
+
+---
+
+## RegisterResponse Type
+
+Response from register endpoint. Semantic alias for AuthUser (same structure, no token).
+
+### Definition
+
+```typescript
+export type RegisterResponse = AuthUser;
+```
+
+### Usage
+
+```typescript
+import { RegisterResponse } from 'src/app/shared/models/auth.model';
+import { UserService } from 'src/app/core/services/user.service';
+
+const newUser: User = {
+  name: 'Jane Smith',
+  email: 'jane@example.com',
+  password: 'securePassword456'
+};
+
+userService.register(newUser).subscribe({
+  next: (response: RegisterResponse) => {
+    console.log('User registered successfully');
+    console.log('User ID:', response._id);
+    console.log('Email:', response.email);
+    console.log('Name:', response.name);
+    // Note: No token returned - user must login after registration
+  },
+  error: (error) => {
+    if (error.message === 'User with this email already exists') {
+      console.error('Email already in use');
+    }
+  }
+});
+```
+
+**Example Response:**
+
+```json
+{
+  "_id": "507f1f77bcf86cd799439011",
+  "email": "jane@example.com",
+  "name": "Jane Smith"
+}
+```
+
+## Complete Authentication Flow Example
+
+```typescript
+import { Component } from '@angular/core';
+import { Router } from '@angular/router';
+import { 
+  User, 
+  AuthUser, 
+  LoginResponse, 
+  RegisterResponse 
+} from 'src/app/shared/models/auth.model';
+import { UserService } from 'src/app/core/services/user.service';
+import { AuthService } from 'src/app/core/services/auth.service';
+
+@Component({
+  selector: 'app-auth-flow',
+  templateUrl: './auth-flow.component.html'
+})
+export class AuthFlowComponent {
+  constructor(
+    private userService: UserService,
+    private authService: AuthService,
+    private router: Router
+  ) {}
+
+  // Registration flow
+  register(name: string, email: string, password: string) {
+    const newUser: User = {
+      name: name,
+      email: email,
+      password: password
+    };
+
+    this.userService.register(newUser).subscribe({
+      next: (response: RegisterResponse) => {
+        console.log('Registration successful!');
+        console.log('Please login with your credentials');
+        // Redirect to login page
+        this.router.navigate(['/auth/login']);
+      },
+      error: (error) => {
+        console.error('Registration failed:', error.message);
+      }
+    });
+  }
+
+  // Login flow
+  login(email: string, password: string) {
+    const credentials: User = {
+      email: email,
+      password: password,
+      name: '' // Not needed for login
+    };
+
+    this.userService.login(credentials).subscribe({
+      next: (response: LoginResponse) => {
+        // Extract token and user
+        const token: string = response.token;
+        const user: AuthUser = response.user;
+
+        // Store session
+        this.authService.setUserSession(user, token);
+
+        console.log('Login successful!');
+        console.log('Welcome,', user.name);
+
+        // Redirect to dashboard
+        this.router.navigate(['/dashboard']);
+      },
+      error: (error) => {
+        console.error('Login failed:', error.message);
+      }
+    });
+  }
+
+  // Logout flow
+  logout() {
+    this.authService.logOut();
+    console.log('Logged out successfully');
+    this.router.navigate(['/auth/login']);
+  }
+
+  // Check current user
+  getCurrentUser() {
+    const email = this.authService.getUserMail();
+    const name = this.authService.getUserName();
+    const token = this.authService.getAuthToken();
+
+    if (token) {
+      console.log('Current user:', { email, name });
+    } else {
+      console.log('No user logged in');
+    }
+  }
+}
+```
+
+## Security Notes
+
+<Warning>
+  **Important Security Considerations:**
+  
+  1. **Password Field**: The `password` field in the `User` interface should only be used for authentication requests. Never store it in component state or local storage.
+  
+  2. **AuthUser vs User**: Always use `AuthUser` for displaying user information in the UI. It's guaranteed to never contain sensitive data.
+  
+  3. **Token Storage**: The JWT token is stored in session storage (not local storage) and is cleared when the browser closes.
+  
+  4. **HTTPS Required**: Always use HTTPS in production to protect credentials and tokens during transmission.
+</Warning>
+
+## Type Differences
+
+| Field | User | AuthUser | LoginResponse | RegisterResponse |
+|-------|------|----------|---------------|------------------|
+| `_id` | Optional | Required | N/A (in user field) | Required |
+| `name` | Required | Required | N/A (in user field) | Required |
+| `email` | Required | Required | N/A (in user field) | Required |
+| `password` | Optional | ❌ Never | ❌ Never | ❌ Never |
+| `token` | ❌ Never | ❌ Never | Required | ❌ Never |
+| `user` | ❌ Never | ❌ Never | Required (AuthUser) | ❌ Never |
+
+## Related
+
+- [UserService](/api/services/user-service) - Login and registration endpoints
+- [AuthService](/api/services/auth-service) - Session management
+- [AuthGuard](/api/guards/auth-guard) - Route protection
+- [AuthInterceptor](/api/interceptors/auth-interceptor) - Token injection

@@ -1,0 +1,417 @@
+---
+title: 'AuthGuard'
+description: 'Route guard for protecting authenticated routes'
+icon: 'shield-halved'
+---
+
+## Overview
+
+The `AuthGuard` is an Angular route guard that protects routes by checking if the user is authenticated. It implements the `CanActivate` interface to control access to routes based on authentication status.
+
+## Import
+
+```typescript
+import { AuthGuard } from 'src/app/core/guards/auth.guard';
+```
+
+## Implementation
+
+```typescript
+import { Injectable } from '@angular/core';
+import { CanActivate, Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
+import { Observable } from 'rxjs';
+import { tap, take } from 'rxjs/operators';
+import { ToastrService } from 'ngx-toastr';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private toastService: ToastrService
+  ) {}
+
+  canActivate(): Observable<boolean> {
+    return this.authService.isLoggedInObservable().pipe(
+      take(1),
+      tap(loggedIn => {
+        if (!loggedIn) {
+          this.toastService.warning(
+            'You must be logged in to access this page.',
+            'Access Denied'
+          );
+          this.router.navigate(['/auth/login']);
+        }
+      })
+    );
+  }
+}
+```
+
+## Method
+
+### canActivate
+
+Determines whether a route can be activated based on user authentication status.
+
+```typescript
+canActivate(): Observable<boolean>
+```
+
+<ResponseField name="return" type="Observable<boolean>">
+  Observable that emits `true` if the user is authenticated, `false` otherwise
+</ResponseField>
+
+**Behavior:**
+1. Checks authentication status via `AuthService.isLoggedInObservable()`
+2. Takes only the first emission using `take(1)`
+3. If not logged in:
+   - Shows a warning toast notification
+   - Redirects to `/auth/login`
+4. Returns the authentication status
+
+## Usage in Routes
+
+### Basic Route Protection
+
+```typescript
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { AuthGuard } from './core/guards/auth.guard';
+import { DashboardComponent } from './pages/dashboard/dashboard.component';
+import { LoginComponent } from './pages/auth/login/login.component';
+
+const routes: Routes = [
+  {
+    path: 'dashboard',
+    component: DashboardComponent,
+    canActivate: [AuthGuard] // Protected route
+  },
+  {
+    path: 'auth/login',
+    component: LoginComponent // Public route
+  }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule {}
+```
+
+### Protecting Multiple Routes
+
+```typescript
+const routes: Routes = [
+  {
+    path: 'favorites',
+    loadChildren: () => import('./pages/favorites/favorites.module').then(m => m.FavoritesModule),
+    canActivate: [AuthGuard]
+  },
+  {
+    path: 'profile',
+    component: ProfileComponent,
+    canActivate: [AuthGuard]
+  },
+  {
+    path: 'settings',
+    component: SettingsComponent,
+    canActivate: [AuthGuard]
+  }
+];
+```
+
+### Protecting Child Routes
+
+```typescript
+const routes: Routes = [
+  {
+    path: 'app',
+    component: AppLayoutComponent,
+    canActivate: [AuthGuard], // Protects parent and all children
+    children: [
+      { path: 'dashboard', component: DashboardComponent },
+      { path: 'favorites', component: FavoritesComponent },
+      { path: 'search', component: SearchComponent }
+    ]
+  }
+];
+```
+
+### Using canActivateChild
+
+```typescript
+// Although not implemented in the current AuthGuard,
+// you can extend it to protect child routes
+
+export class AuthGuard implements CanActivate, CanActivateChild {
+  canActivate(): Observable<boolean> {
+    return this.checkAuth();
+  }
+
+  canActivateChild(): Observable<boolean> {
+    return this.checkAuth();
+  }
+
+  private checkAuth(): Observable<boolean> {
+    return this.authService.isLoggedInObservable().pipe(
+      take(1),
+      tap(loggedIn => {
+        if (!loggedIn) {
+          this.toastService.warning(
+            'You must be logged in to access this page.',
+            'Access Denied'
+          );
+          this.router.navigate(['/auth/login']);
+        }
+      })
+    );
+  }
+}
+```
+
+## Complete Example
+
+### app-routing.module.ts
+
+```typescript
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { AuthGuard } from './core/guards/auth.guard';
+
+const routes: Routes = [
+  // Public routes
+  {
+    path: '',
+    redirectTo: '/home',
+    pathMatch: 'full'
+  },
+  {
+    path: 'home',
+    loadChildren: () => import('./pages/home/home.module').then(m => m.HomeModule)
+  },
+  {
+    path: 'auth',
+    loadChildren: () => import('./pages/auth/auth.module').then(m => m.AuthModule)
+  },
+  
+  // Protected routes
+  {
+    path: 'dashboard',
+    loadChildren: () => import('./pages/dashboard/dashboard.module').then(m => m.DashboardModule),
+    canActivate: [AuthGuard]
+  },
+  {
+    path: 'favorites',
+    loadChildren: () => import('./pages/favorites/favorites.module').then(m => m.FavoritesModule),
+    canActivate: [AuthGuard]
+  },
+  {
+    path: 'search',
+    loadChildren: () => import('./pages/search/search.module').then(m => m.SearchModule),
+    canActivate: [AuthGuard]
+  },
+  
+  // Fallback
+  {
+    path: '**',
+    redirectTo: '/home'
+  }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule {}
+```
+
+## User Experience Flow
+
+### Scenario 1: Unauthenticated User
+
+1. User navigates to `/favorites` (protected route)
+2. `AuthGuard.canActivate()` checks authentication
+3. `isLoggedInObservable()` emits `false`
+4. Toast notification appears: "You must be logged in to access this page."
+5. User is redirected to `/auth/login`
+6. Route activation is prevented
+
+### Scenario 2: Authenticated User
+
+1. User navigates to `/favorites` (protected route)
+2. `AuthGuard.canActivate()` checks authentication
+3. `isLoggedInObservable()` emits `true`
+4. Route activation proceeds
+5. User sees the favorites page
+
+## Testing
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { Router } from '@angular/router';
+import { AuthGuard } from './auth.guard';
+import { AuthService } from '../services/auth.service';
+import { ToastrService } from 'ngx-toastr';
+import { of } from 'rxjs';
+
+describe('AuthGuard', () => {
+  let guard: AuthGuard;
+  let authService: jasmine.SpyObj<AuthService>;
+  let router: jasmine.SpyObj<Router>;
+  let toastService: jasmine.SpyObj<ToastrService>;
+
+  beforeEach(() => {
+    const authServiceSpy = jasmine.createSpyObj('AuthService', ['isLoggedInObservable']);
+    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+    const toastServiceSpy = jasmine.createSpyObj('ToastrService', ['warning']);
+
+    TestBed.configureTestingModule({
+      providers: [
+        AuthGuard,
+        { provide: AuthService, useValue: authServiceSpy },
+        { provide: Router, useValue: routerSpy },
+        { provide: ToastrService, useValue: toastServiceSpy }
+      ]
+    });
+
+    guard = TestBed.inject(AuthGuard);
+    authService = TestBed.inject(AuthService) as jasmine.SpyObj<AuthService>;
+    router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+    toastService = TestBed.inject(ToastrService) as jasmine.SpyObj<ToastrService>;
+  });
+
+  it('should allow activation when user is logged in', (done) => {
+    authService.isLoggedInObservable.and.returnValue(of(true));
+
+    guard.canActivate().subscribe(canActivate => {
+      expect(canActivate).toBe(true);
+      expect(router.navigate).not.toHaveBeenCalled();
+      expect(toastService.warning).not.toHaveBeenCalled();
+      done();
+    });
+  });
+
+  it('should prevent activation and redirect when user is not logged in', (done) => {
+    authService.isLoggedInObservable.and.returnValue(of(false));
+
+    guard.canActivate().subscribe(canActivate => {
+      expect(canActivate).toBe(false);
+      expect(toastService.warning).toHaveBeenCalledWith(
+        'You must be logged in to access this page.',
+        'Access Denied'
+      );
+      expect(router.navigate).toHaveBeenCalledWith(['/auth/login']);
+      done();
+    });
+  });
+});
+```
+
+## Dependencies
+
+### AuthService
+
+Provides the authentication status via `isLoggedInObservable()`:
+
+```typescript
+this.authService.isLoggedInObservable() // Observable<boolean>
+```
+
+### Router
+
+Handles navigation to the login page:
+
+```typescript
+this.router.navigate(['/auth/login'])
+```
+
+### ToastrService
+
+Displays user-friendly toast notifications:
+
+```typescript
+this.toastService.warning('message', 'title')
+```
+
+## RxJS Operators
+
+### take(1)
+
+Takes only the first emission from the observable and completes:
+
+```typescript
+.pipe(take(1)) // Only check auth status once per navigation
+```
+
+### tap
+
+Performs side effects (navigation, toast) without modifying the stream:
+
+```typescript
+.pipe(
+  tap(loggedIn => {
+    if (!loggedIn) {
+      // Side effects
+    }
+  })
+)
+```
+
+## Best Practices
+
+<Tip>
+  **Best Practices for AuthGuard:**
+  
+  1. **Always use with AuthService**: The guard relies on AuthService to maintain consistent authentication state.
+  
+  2. **User-friendly feedback**: Always show a toast notification or message when denying access.
+  
+  3. **Consistent redirect**: Always redirect to the same login route for predictable UX.
+  
+  4. **Test thoroughly**: Write unit tests to ensure the guard behaves correctly in both authenticated and unauthenticated scenarios.
+  
+  5. **Return URL**: Consider storing the attempted URL to redirect back after login.
+</Tip>
+
+## Return URL Implementation (Enhancement)
+
+```typescript
+export class AuthGuard implements CanActivate {
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private toastService: ToastrService
+  ) {}
+
+  canActivate(route: ActivatedRouteSnapshot): Observable<boolean> {
+    return this.authService.isLoggedInObservable().pipe(
+      take(1),
+      tap(loggedIn => {
+        if (!loggedIn) {
+          this.toastService.warning(
+            'You must be logged in to access this page.',
+            'Access Denied'
+          );
+          
+          // Store the attempted URL for redirecting after login
+          const returnUrl = route.url.map(segment => segment.path).join('/');
+          this.router.navigate(['/auth/login'], {
+            queryParams: { returnUrl: `/${returnUrl}` }
+          });
+        }
+      })
+    );
+  }
+}
+```
+
+## Related
+
+- [AuthService](/api/services/auth-service) - Provides authentication state
+- [AuthInterceptor](/api/interceptors/auth-interceptor) - Injects auth tokens in HTTP requests
+- [UserService](/api/services/user-service) - Handles login and registration

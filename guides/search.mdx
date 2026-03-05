@@ -1,0 +1,397 @@
+---
+title: 'Search Functionality'
+description: 'Learn how to search for movies and TV shows using the OMDB API integration with advanced filtering and pagination'
+icon: 'magnifying-glass'
+---
+
+## Overview
+
+ScreenPulse's search feature allows users to find movies, TV shows, and series using the OMDB (Open Movie Database) API. The search system supports title search, type filtering, year filtering, and pagination.
+
+## Key Components
+
+- **OmdbService** (`src/app/shared/services/omdb/omdb.service.ts`) - Handles OMDB API requests
+- **SearchComponent** (`src/app/pages/search/page/search.component.ts`) - Main search page
+- **SearchBarComponent** - Search form with filters
+- **MovieResultsTableComponent** - Displays search results
+
+## Search Service
+
+The `OmdbService` provides methods to interact with the OMDB API:
+
+```typescript src/app/shared/services/omdb/omdb.service.ts
+import { Injectable } from '@angular/core';
+import { Observable} from 'rxjs';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { environment } from 'src/environments/environment.development';
+import { OmdbResponse } from '../../models/omdbResponse.model';
+import { OmdbDetails } from '../../models/ombdDetails';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class OmdbService {
+
+  constructor(private http: HttpClient) { }
+
+  fetchMediaItems(title: string, type: string, year: string, page: number): Observable<OmdbResponse> {
+    const options = {
+      params: new HttpParams()
+        .set('title', title.trim())
+        .set('type', type)
+        .set('year', year)
+        .set('page', page.toString())
+    };
+    return this.http.get<OmdbResponse>(`${environment.serverSearchURL}`, options)
+  }
+  
+  getMediaItemInfo(imdbId: string): Observable<OmdbDetails> {
+    return this.http.get<OmdbDetails>(`${environment.serverSearchURL}/${imdbId}`)
+  }
+}
+```
+
+## Search Parameters
+
+### Available Filters
+
+<ParamField path="title" type="string" required>
+  The title of the movie or TV show to search for. Automatically trimmed of whitespace.
+</ParamField>
+
+<ParamField path="type" type="string" default="all">
+  Filter by media type:
+  - `all` - Search all types
+  - `movie` - Movies only
+  - `series` - TV series only
+  - `episode` - Episodes only
+</ParamField>
+
+<ParamField path="year" type="string">
+  Filter by release year (e.g., "2020"). Leave empty to search all years.
+</ParamField>
+
+<ParamField path="page" type="number" default="1">
+  Page number for pagination. Each page returns up to 10 results.
+</ParamField>
+
+## Performing a Search
+
+<Steps>
+  <Step title="User submits search form">
+    The user enters search criteria in the `SearchBarComponent` and submits the form:
+    
+    ```typescript src/app/pages/search/page/search.component.ts
+    handleSubmit(filters: SearchFilters): void {
+      this.searchState = {
+        ...this.searchState,
+        ...filters,
+        currentPage: 1,
+        searchOnProcess: true
+      };
+      this.fetchMediaItems();
+    }
+    ```
+  </Step>
+
+  <Step title="Call OMDB API through service">
+    The component calls the `OmdbService` with search parameters:
+    
+    ```typescript src/app/pages/search/page/search.component.ts
+    private fetchMediaItems(): void {
+      this.omdbService.fetchMediaItems(
+        this.searchState.title,
+        this.searchState.type,
+        this.searchState.year,
+        this.searchState.currentPage)
+        .subscribe({
+          next: (response) => {
+            if (response.Response === "True") {
+              this.searchState.collection = response.Search || [];
+              this.searchState.collectionSize = Number(response.totalResults) || 0;
+              this.focusOnResultsTable()
+            } else {
+              this.toastrService.warning(response.Error, 'Try again!');
+              this.searchState.collection = [];
+            }
+            this.searchState.searchOnProcess = false;
+          },
+          error: (error) => {
+            this.toastrService.error(error.message);
+            this.searchState.searchOnProcess = false;
+          }
+        })
+    }
+    ```
+  </Step>
+
+  <Step title="Display results">
+    Results are displayed in a table with poster, title, year, and type columns. Users can click on items to view details or add them to favorites.
+  </Step>
+</Steps>
+
+## Search State Management
+
+The `SearchComponent` maintains search state using a `SearchState` interface:
+
+```typescript src/app/pages/search/page/search.component.ts
+searchState: SearchState = {
+  title: '',
+  type: 'all',
+  year: '',
+  currentPage: 1,
+  pageSize: 10,
+  collection: [],
+  collectionSize: 0,
+  searchOnProcess: false,
+};
+```
+
+### State Properties
+
+- **title** - Current search query
+- **type** - Selected media type filter
+- **year** - Selected year filter
+- **currentPage** - Current pagination page
+- **pageSize** - Results per page (fixed at 10)
+- **collection** - Array of search results
+- **collectionSize** - Total number of results available
+- **searchOnProcess** - Loading state indicator
+
+## Pagination
+
+Handle pagination by updating the current page and re-fetching results:
+
+```typescript src/app/pages/search/page/search.component.ts
+loadPage(page: number): void {
+  this.searchState.currentPage = page;
+  this.fetchMediaItems();
+}
+```
+
+The OMDB API returns 10 results per page. The total number of results is available in `response.totalResults`.
+
+## Viewing Media Details
+
+Click on a search result to open a detailed view with additional information:
+
+```typescript src/app/pages/search/page/search.component.ts
+openMediaItem(mediaItem: MediaItem): void {
+  this.loadingCard = true;
+  this.dialogService
+    .openMediaItem(window.innerWidth, mediaItem, false)
+    .pipe(finalize(() => (this.loadingCard = false)))
+    .subscribe();
+}
+```
+
+The dialog fetches detailed information using the IMDB ID:
+
+```typescript
+getMediaItemInfo(imdbId: string): Observable<OmdbDetails> {
+  return this.http.get<OmdbDetails>(`${environment.serverSearchURL}/${imdbId}`)
+}
+```
+
+## Adding to Favorites from Search
+
+Users can add items directly from search results:
+
+```typescript src/app/pages/search/page/search.component.ts
+addToFavorites(mediaItem: MediaItem) {
+  this.authService.isLoggedInObservable().pipe(
+    take(1),
+    switchMap(loggedIn => {
+      if (!loggedIn) {
+        this.toastrService.warning('You must be logged in to add movies to your list', 'Error');
+        this.router.navigate(['/auth/login']);
+        return EMPTY; 
+      }
+      return this.favoritesService.addToFavorites(mediaItem);
+    })
+  ).subscribe({
+    next: () => this.toastrService.success(mediaItem.title, 'Added to favorites'),
+    error: (error) => this.toastrService.warning(error.message)
+  });
+}
+```
+
+<Note>
+  Users must be logged in to add items to favorites. The function checks authentication status before proceeding.
+</Note>
+
+## Featured Media
+
+The search page displays featured media items from a predefined constant:
+
+```typescript src/app/pages/search/page/search.component.ts
+featuredMedia: MediaItem[] = FEATURED_MEDIA;
+```
+
+These are displayed in a carousel component before search results.
+
+## API Integration
+
+The OMDB API is accessed through a proxy endpoint configured in the environment:
+
+```typescript src/environments/environment.development.ts
+export const environment = {
+    serverSearchURL : 'http://localhost:9000/api/omdb',
+    // ...
+};
+```
+
+### API Response Format
+
+**Search Response:**
+```json
+{
+  "Search": [
+    {
+      "Title": "The Matrix",
+      "Year": "1999",
+      "imdbID": "tt0133093",
+      "Type": "movie",
+      "Poster": "https://..."
+    }
+  ],
+  "totalResults": "150",
+  "Response": "True"
+}
+```
+
+**Details Response:**
+```json
+{
+  "Title": "The Matrix",
+  "Year": "1999",
+  "Director": "Lana Wachowski, Lilly Wachowski",
+  "Actors": "Keanu Reeves, Laurence Fishburne",
+  "Plot": "A computer hacker learns...",
+  "imdbRating": "8.7",
+  "Poster": "https://...",
+  "youtubeURLTrailer": "https://youtube.com/..."
+}
+```
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="No Results Found">
+    When the API returns no results:
+    
+    ```typescript
+    if (response.Response === "True") {
+      // Handle results
+    } else {
+      this.toastrService.warning(response.Error, 'Try again!');
+      this.searchState.collection = [];
+    }
+    ```
+    
+    Common error messages:
+    - "Movie not found!" - No results match the search criteria
+    - "Too many results" - Search is too broad, add more filters
+  </Accordion>
+
+  <Accordion title="API Connection Error">
+    If the backend server is unreachable:
+    
+    ```typescript
+    error: (error) => {
+      this.toastrService.error(error.message);
+      this.searchState.searchOnProcess = false;
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Invalid Parameters">
+    The service automatically trims the title and converts parameters to strings:
+    
+    ```typescript
+    const options = {
+      params: new HttpParams()
+        .set('title', title.trim())
+        .set('type', type)
+        .set('year', year)
+        .set('page', page.toString())
+    };
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Search Results Table
+
+The search results are displayed in a table with the following columns:
+
+```typescript src/app/pages/search/page/search.component.ts
+displayedColumns: string[] = ['title', 'year', 'type', 'poster', 'Add'];
+```
+
+- **Title** - Movie or TV show title
+- **Year** - Release year
+- **Type** - Media type (movie, series, episode)
+- **Poster** - Thumbnail image
+- **Add** - Button to add to favorites
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Trim Search Input" icon="scissors">
+    Always trim whitespace from search titles to avoid API errors and improve search accuracy.
+  </Card>
+  
+  <Card title="Handle Loading States" icon="spinner">
+    Use `searchOnProcess` to show loading indicators and prevent duplicate requests.
+  </Card>
+  
+  <Card title="Check Authentication" icon="shield">
+    Verify users are logged in before allowing them to add items to favorites.
+  </Card>
+  
+  <Card title="Implement Pagination" icon="list-ol">
+    Display pagination controls when `collectionSize` exceeds `pageSize` to help users navigate results.
+  </Card>
+</CardGroup>
+
+## Example Usage
+
+### Basic Search
+
+```typescript
+// Search for movies with "matrix" in the title
+this.omdbService.fetchMediaItems('matrix', 'movie', '', 1)
+  .subscribe(response => {
+    console.log(response.Search);
+  });
+```
+
+### Search with Filters
+
+```typescript
+// Search for series from 2020
+this.omdbService.fetchMediaItems('breaking', 'series', '2020', 1)
+  .subscribe(response => {
+    console.log(response.Search);
+  });
+```
+
+### Get Detailed Information
+
+```typescript
+// Get details for a specific movie
+this.omdbService.getMediaItemInfo('tt0133093')
+  .subscribe(details => {
+    console.log(details.Plot);
+    console.log(details.imdbRating);
+  });
+```
+
+## Related Files
+
+- `src/app/shared/services/omdb/omdb.service.ts` - OMDB API service
+- `src/app/pages/search/page/search.component.ts` - Search page component
+- `src/app/pages/search/components/search-bar/search-bar.component.ts` - Search form
+- `src/app/pages/search/components/movie-results-table/movie-results-table.component.ts` - Results table
+- `src/app/pages/search/components/carousel/carousel.component.ts` - Featured media carousel
+- `src/environments/environment.development.ts` - Environment configuration

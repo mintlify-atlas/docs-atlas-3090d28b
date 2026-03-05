@@ -1,0 +1,353 @@
+---
+title: 'Favorites Page'
+description: 'User favorites collection with sorting, filtering, and CRUD operations'
+icon: 'heart'
+---
+
+## Overview
+
+The Favorites page displays the authenticated user's saved media collection with advanced sorting, filtering, pagination, and management capabilities.
+
+**Location**: `src/app/pages/favorites/page/favorites.component.ts`
+
+## Key Features
+
+- **CRUD Operations**: View, update, and delete favorites
+- **Advanced Filtering**: Filter by media type (movie, series, game)
+- **Sorting**: Sort by title or year (ascending/descending)
+- **Search**: Text search within favorites
+- **Pagination**: Server-side pagination
+- **Personal Notes**: Add/edit descriptions for each favorite
+
+## Component Structure
+
+```typescript
+@Component({
+  selector: 'app-favorites',
+  templateUrl: './favorites.component.html',
+  styleUrls: ['./favorites.component.scss'],
+})
+export class FavoritesComponent implements OnInit {
+  favorites: MediaItem[] | [] = [];
+  
+  searchParams: FavoritesSearchParams = {
+    currentPage: 1,
+    pageSize: 10,
+    sortField: undefined,
+    mediaType: undefined,
+    sortOrder: undefined,
+    searchTerm: undefined,
+  };
+
+  favoritesSize = 0;
+  isLoadingFavorites = false;
+  userName: string | null = '';
+  isRevalidatingAfterDelete = false;
+  loadingCard = false;
+
+  constructor(
+    private toastrService: ToastrService,
+    private favoritesService: FavoritesService,
+    private authService: AuthService,
+    private dialogService: DialogService
+  ) { }
+}
+```
+
+## Sub-Components
+
+### 1. Sorting Controls
+
+**Component**: `SortingControlsComponent`  
+**Purpose**: Provides UI for sorting, filtering, and media type selection
+
+<ParamField path="currentSort" type="FavoritesSearchParams">
+  Current sort/filter state from parent
+</ParamField>
+
+<ParamField path="sortChange" type="EventEmitter<{field: string, order: number}>">
+  Emits when user changes sort (field: 'title' | 'year', order: 1 | -1)
+</ParamField>
+
+<ParamField path="filterChange" type="EventEmitter<string>">
+  Emits when user types in search input
+</ParamField>
+
+<ParamField path="mediaTypeChange" type="EventEmitter<string>">
+  Emits when user selects media type ('movie' | 'series' | 'game' | 'all')
+</ParamField>
+
+**Usage**:
+```html
+<app-sorting-controls 
+  [currentSort]="searchParams" 
+  (sortChange)="onSort($event)" 
+  (filterChange)="onFilter($event)"
+  (mediaTypeChange)="onMediaTypeChange($event)">
+</app-sorting-controls>
+```
+
+### 2. Favorites Card
+
+**Component**: `FavoritesCardComponent`  
+**Purpose**: Displays individual favorite item with view/edit modes
+
+<ParamField path="item" type="MediaItem">
+  Media item to display
+</ParamField>
+
+<ParamField path="initialHoverstate" type="boolean" default="false">
+  Initial hover state for card
+</ParamField>
+
+<ParamField path="itemToDelete" type="EventEmitter<string>">
+  Emits item ID when delete button clicked
+</ParamField>
+
+<ParamField path="itemToOpen" type="EventEmitter<MediaItem>">
+  Emits when poster clicked to open details
+</ParamField>
+
+<ParamField path="descriptionToAdd" type="EventEmitter<MediaItem>">
+  Emits when user saves a review/note
+</ParamField>
+
+<ParamField path="descriptionToDelete" type="EventEmitter<MediaItem>">
+  Emits when user deletes a review/note
+</ParamField>
+
+**Usage**:
+```html
+<app-favorites-card 
+  [item]="item" 
+  (itemToDelete)="deleteFavorite($event)"
+  (descriptionToAdd)="updateFavorite($event)"
+  (descriptionToDelete)="updateFavorite($event)"
+  (itemToOpen)="openFavorite($event)">
+</app-favorites-card>
+```
+
+## Core Methods
+
+### loadAllFavorites()
+
+Fetches favorites from the backend with current search parameters.
+
+```typescript
+loadAllFavorites(): void {
+  this.favoritesService.getFavorites(
+    this.searchParams.currentPage,
+    this.searchParams.pageSize,
+    this.searchParams.sortField,
+    this.searchParams.sortOrder,
+    this.searchParams.searchTerm,
+    this.searchParams.mediaType
+  )
+  .pipe(
+    finalize(() => {
+      this.isLoadingFavorites = false;
+    })
+  )
+  .subscribe({
+    next: (response) => {
+      this.favorites = response.favorites;
+      this.favoritesSize = response.totalFavorites;
+      this.isRevalidatingAfterDelete = false;
+    },
+    error: (error) => {
+      console.error(error);
+      this.toastrService.error(error.message);
+    },
+  });
+}
+```
+
+### onPageChanged()
+
+Handles pagination events.
+
+```typescript
+onPageChanged(event: PageEvent): void {
+  this.searchParams.currentPage = event.pageIndex + 1;
+  this.loadAllFavorites();
+}
+```
+
+### onMediaTypeChange()
+
+Filters favorites by media type.
+
+```typescript
+onMediaTypeChange(mediaType: string): void {
+  this.searchParams.mediaType = mediaType;
+  this.searchParams.currentPage = 1;
+  this.loadAllFavorites();
+}
+```
+
+### onSort()
+
+Handles sort changes.
+
+```typescript
+onSort(event: { field: string, order: number }): void {
+  this.searchParams.sortField = event.field;
+  this.searchParams.sortOrder = event.order;
+  this.searchParams.currentPage = 1;
+  this.loadAllFavorites();
+}
+```
+
+### onFilter()
+
+Handles search term filtering.
+
+```typescript
+onFilter(searchTerm: string): void {
+  this.searchParams.searchTerm = searchTerm;
+  this.searchParams.currentPage = 1;
+  this.loadAllFavorites();
+}
+```
+
+### deleteFavorite()
+
+Deletes a favorite item and refreshes the list.
+
+```typescript
+deleteFavorite(_id: string): void {
+  this.favoritesService.deleteMediaItem(_id).subscribe({
+    next: (response) => {
+      this.favorites = this.favorites.filter((movie) => movie._id != _id);
+      if (this.favorites.length === 0) {
+        this.isLoadingFavorites = true;
+        this.isRevalidatingAfterDelete = true;
+        this.searchParams.currentPage = 1;
+        this.loadAllFavorites();
+      }
+      this.favoritesSize = this.favoritesSize - 1;
+      this.toastrService.success(response.message);
+    },
+    error: () => {
+      this.toastrService.error('Cannot delete item, try again later');
+    },
+  });
+}
+```
+
+### updateFavorite()
+
+Updates a favorite item's description.
+
+```typescript
+updateFavorite(mediaItem: MediaItem): void {
+  this.favoritesService.updateFavorite(mediaItem)
+    .subscribe({
+      next: (updatedMediaItem) => {
+        this.favorites = this.favorites.map(movie =>
+          movie._id === updatedMediaItem._id 
+            ? { ...movie, description: updatedMediaItem.description } 
+            : movie
+        );
+        this.toastrService.success('Item updated');
+      },
+      error: () => {
+        this.toastrService.error('Cannot update item, try again later');
+      },
+    });
+}
+```
+
+### openFavorite()
+
+Opens the media details dialog for a favorite.
+
+```typescript
+openFavorite(favoriteMediaItemToOpen: MediaItem): void {
+  this.loadingCard = true;
+  this.dialogService
+    .openMediaItem(window.innerWidth, favoriteMediaItemToOpen, true)
+    .pipe(finalize(() => (this.loadingCard = false)))
+    .subscribe();
+}
+```
+
+## Template Structure
+
+```html
+<div class="title">
+  <h1>
+    <span class="user-name">{{ userName | uppercase }}</span> 's favorites collection
+  </h1>
+</div>
+
+<ng-container *ngIf="!isLoadingFavorites; else noFavoritesLoaded">
+  <div class="all-favorites-container">
+    <app-sorting-controls 
+      [currentSort]="searchParams" 
+      (sortChange)="onSort($event)" 
+      (filterChange)="onFilter($event)"
+      (mediaTypeChange)="onMediaTypeChange($event)">
+    </app-sorting-controls>
+    
+    <div class="all-favorites-card">
+      <ng-container *ngFor="let item of favorites; trackBy : trackByFn">
+        <app-favorites-card 
+          [item]="item" 
+          (itemToDelete)="deleteFavorite($event)"
+          (descriptionToDelete)="updateFavorite($event)" 
+          (descriptionToAdd)="updateFavorite($event)"
+          (itemToOpen)="openFavorite($event)">
+        </app-favorites-card>
+      </ng-container>
+      
+      <ng-container *ngIf="favorites.length === 0 && !isRevalidatingAfterDelete">
+        <app-empty-state></app-empty-state>
+      </ng-container>
+    </div>
+    
+    <div class="paginator-container">
+      <mat-paginator 
+        [pageSize]="searchParams.pageSize" 
+        [pageIndex]="searchParams.currentPage - 1" 
+        [hidePageSize]="true"
+        [length]="favoritesSize" 
+        (page)="onPageChanged($event)" 
+        showFirstLastButtons>
+      </mat-paginator>
+    </div>
+  </div>
+</ng-container>
+
+<ng-template #noFavoritesLoaded>
+  <app-loading-spinner></app-loading-spinner>
+</ng-template>
+```
+
+## FavoritesService Integration
+
+The component relies on `FavoritesService` for all backend operations:
+
+- `getFavorites()`: Fetch paginated favorites with filters
+- `deleteMediaItem()`: Remove a favorite
+- `updateFavorite()`: Update favorite description
+
+## Performance Optimizations
+
+### TrackBy Function
+
+```typescript
+trackByFn(index: number, item: MediaItem): string {
+  return item.imdbID;
+}
+```
+
+Used in `*ngFor` to optimize rendering by tracking items by their unique IMDB ID.
+
+## Dependencies
+
+- **FavoritesService**: Manages favorites CRUD operations
+- **AuthService**: Gets current user information
+- **DialogService**: Opens media detail dialogs
+- **ToastrService**: Displays notifications
+- **Material Paginator**: Handles pagination UI

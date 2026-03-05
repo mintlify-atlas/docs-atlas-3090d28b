@@ -1,0 +1,492 @@
+---
+title: 'Media Details & Trailers'
+description: 'Display detailed movie information, embedded YouTube trailers, IMDB ratings, cast, and plot summaries'
+icon: 'film'
+---
+
+## Overview
+
+ScreenPulse provides detailed views of movies and TV shows through dialog components that display comprehensive information including plot summaries, cast, directors, IMDB ratings, and embedded YouTube trailers.
+
+## Key Components
+
+- **MediaItemDialogComponent** (`src/app/shared/components/movie-dialog/movie-dialog.component.ts`) - Main details dialog
+- **TrailerDialogComponent** (`src/app/shared/components/trailer-dialog/trailer-dialog.component.ts`) - YouTube trailer player
+- **DialogService** (`src/app/shared/services/dialog/dialog.service.ts`) - Service to open dialogs
+- **OmdbService** - Fetches detailed information from OMDB API
+
+## Movie Details Dialog
+
+The `MediaItemDialogComponent` displays comprehensive movie information:
+
+```typescript src/app/shared/components/movie-dialog/movie-dialog.component.ts
+import { Component, Inject } from '@angular/core';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { MediaItem } from '../../models/movie.model';
+import { ToastrService } from 'ngx-toastr';
+import { FavoritesService } from '../../services/favorites/favorites.service';
+import { AuthService } from 'src/app/core/services/auth.service';
+import { Router } from '@angular/router';
+import { MediaItemDialogData } from '../../models/movieDialogData.model';
+import { SafeResourceUrl } from '@angular/platform-browser';
+import { DialogService } from '../../services/dialog/dialog.service';
+import { EMPTY, switchMap, take } from 'rxjs';
+
+@Component({
+  selector: 'app-movie-dialog',
+  templateUrl: './movie-dialog.component.html',
+  styleUrls: ['./movie-dialog.component.scss']
+})
+export class MediaItemDialogComponent {
+  showPlayer = false;
+  videoUrl!: SafeResourceUrl;
+  imdbLogoPath  = '/assets/images/imdb.png';
+  
+  constructor(
+    @Inject(MAT_DIALOG_DATA) public data: MediaItemDialogData,
+    private toastrService: ToastrService,
+    private favoritesService: FavoritesService,
+    private authService: AuthService,
+    private router: Router,
+    private dialogRef: MatDialogRef<MediaItemDialogComponent>,
+    private dialogService: DialogService
+  ) { }
+
+  // ... methods below
+}
+```
+
+## Opening a Media Dialog
+
+<Steps>
+  <Step title="Fetch detailed information">
+    Get full details from the OMDB API using the IMDB ID:
+    
+    ```typescript
+    openMediaItem(mediaItem: MediaItem): void {
+      this.loadingCard = true;
+      this.dialogService
+        .openMediaItem(window.innerWidth, mediaItem, false)
+        .pipe(finalize(() => (this.loadingCard = false)))
+        .subscribe();
+    }
+    ```
+    
+    The service calls:
+    
+    ```typescript src/app/shared/services/omdb/omdb.service.ts
+    getMediaItemInfo(imdbId: string): Observable<OmdbDetails> {
+      return this.http.get<OmdbDetails>(`${environment.serverSearchURL}/${imdbId}`)
+    }
+    ```
+  </Step>
+
+  <Step title="Display in Material Dialog">
+    The dialog opens using Angular Material's dialog system with the fetched data injected via `MAT_DIALOG_DATA`.
+  </Step>
+
+  <Step title="Render details">
+    The template displays:
+    - Poster image
+    - Title and year
+    - Plot summary
+    - Director and actors
+    - Genre and language
+    - Runtime and country
+    - IMDB rating and votes
+    - Play trailer button (if available)
+  </Step>
+</Steps>
+
+## Dialog Data Structure
+
+The dialog receives data through the `MediaItemDialogData` interface:
+
+```typescript
+interface MediaItemDialogData {
+  response: OmdbDetails;        // Full movie details from OMDB
+  movie: MediaItem;             // Basic movie info
+  fromFavoritesSection: boolean; // Whether opened from favorites
+}
+```
+
+### OmdbDetails Properties
+
+- **Title** - Movie/show title
+- **Year** - Release year
+- **Poster** - Poster image URL
+- **Director** - Director name(s)
+- **Actors** - Main cast members
+- **Plot** - Plot summary
+- **Genre** - Genre(s)
+- **Language** - Language(s)
+- **Country** - Country of origin
+- **Runtime** - Duration
+- **imdbRating** - IMDB rating (e.g., "8.5")
+- **imdbVotes** - Number of votes (e.g., "10,000")
+- **youtubeURLTrailer** - YouTube trailer URL
+
+## Adding to Favorites from Dialog
+
+Users can add movies to favorites directly from the details dialog:
+
+```typescript src/app/shared/components/movie-dialog/movie-dialog.component.ts
+addToFavorites(mediaItem: MediaItem) {
+  this.authService.isLoggedInObservable().pipe(
+    take(1),
+    switchMap(loggedIn => {
+      if (!loggedIn) {
+        this.toastrService.error('You must be logged in to add movies to your list', 'Error');
+        this.dialogRef.close();
+        this.router.navigate(['/auth/login']);
+        return EMPTY; 
+      }
+      return this.favoritesService.addToFavorites(mediaItem);
+    })
+  ).subscribe({
+    next: () => this.toastrService.success(mediaItem.title, 'Added to favorites'),
+    error: (error) => this.toastrService.warning(error.message)
+  });
+}
+```
+
+<Note>
+  If the user is not logged in, the dialog closes and they're redirected to the login page.
+</Note>
+
+## Poster Image Handling
+
+The component handles missing or broken poster images:
+
+```typescript src/app/shared/components/movie-dialog/movie-dialog.component.ts
+onImageError(event: Event) {
+  const target = event.target as HTMLImageElement;
+  target.src = 'assets/images/no_poster.jpg';
+}
+```
+
+Apply this to the image element:
+
+```html
+<img 
+  [src]="data.response.Poster" 
+  (error)="onImageError($event)"
+  alt="{{ data.response.Title }} poster"
+/>
+```
+
+## YouTube Trailer Integration
+
+### Playing Trailers
+
+Click the play button to open the trailer in a separate dialog:
+
+```typescript src/app/shared/components/movie-dialog/movie-dialog.component.ts
+playTrailer(): void {
+  if (!this.data.response.youtubeURLTrailer) return;
+
+  this.dialogService.openTrailerDialog(
+    this.data.response.youtubeURLTrailer,
+  );
+}
+```
+
+### Trailer Dialog Component
+
+The `TrailerDialogComponent` embeds and plays YouTube videos:
+
+```typescript src/app/shared/components/trailer-dialog/trailer-dialog.component.ts
+import { Component, Inject, OnInit } from '@angular/core';
+import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
+import { TrailerDialogData } from '../../models/trailerDialogData.model';
+
+@Component({
+  selector: 'app-trailer-dialog',
+  templateUrl: './trailer-dialog.component.html',
+  styleUrls: ['./trailer-dialog.component.scss']
+})
+export class TrailerDialogComponent implements OnInit {
+  safeVideoUrl!: SafeResourceUrl;
+
+  constructor(
+    @Inject(MAT_DIALOG_DATA) public data: TrailerDialogData,
+    private dialogRef: MatDialogRef<TrailerDialogComponent>,
+    private sanitizer: DomSanitizer
+  ) {}
+
+  ngOnInit(): void {
+    const videoId = this.extractYouTubeId(this.data.videoUrl);
+    const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0`;
+    this.safeVideoUrl = this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+  }
+
+  private extractYouTubeId(url: string): string {
+    const regExp = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{11})/;
+    const match = url.match(regExp);
+    return match && match[1] ? match[1] : '';
+  }
+
+  close(): void {
+    this.dialogRef.close();
+  }
+}
+```
+
+### YouTube URL Parsing
+
+The component extracts the video ID from various YouTube URL formats:
+
+- `https://www.youtube.com/watch?v=VIDEO_ID`
+- `https://youtu.be/VIDEO_ID`
+- `https://www.youtube.com/embed/VIDEO_ID`
+
+```typescript
+private extractYouTubeId(url: string): string {
+  const regExp = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{11})/;
+  const match = url.match(regExp);
+  return match && match[1] ? match[1] : '';
+}
+```
+
+### Secure Embed URL
+
+The embed URL is sanitized to prevent XSS attacks:
+
+```typescript
+const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&controls=1&rel=0`;
+this.safeVideoUrl = this.sanitizer.bypassSecurityTrustResourceUrl(embedUrl);
+```
+
+**URL Parameters:**
+- `autoplay=1` - Automatically play video when opened
+- `controls=1` - Show YouTube player controls
+- `rel=0` - Don't show related videos at the end
+
+## IMDB Rating Display
+
+The dialog displays IMDB ratings with the official logo:
+
+```typescript src/app/shared/components/movie-dialog/movie-dialog.component.ts
+imdbLogoPath = '/assets/images/imdb.png';
+```
+
+```html
+<div class="rating">
+  <img [src]="imdbLogoPath" alt="IMDB">
+  <span>{{ data.response.imdbRating }}/10</span>
+  <span class="votes">({{ data.response.imdbVotes }} votes)</span>
+</div>
+```
+
+## Dialog Configuration
+
+The `DialogService` can configure dialog size based on screen width:
+
+```typescript
+openMediaItem(screenWidth: number, mediaItem: MediaItem, fromFavorites: boolean) {
+  const dialogWidth = screenWidth > 768 ? '800px' : '95vw';
+  
+  return this.omdbService.getMediaItemInfo(mediaItem.imdbID).pipe(
+    switchMap(details => {
+      const dialogRef = this.dialog.open(MediaItemDialogComponent, {
+        width: dialogWidth,
+        maxWidth: '95vw',
+        data: {
+          response: details,
+          movie: mediaItem,
+          fromFavoritesSection: fromFavorites
+        }
+      });
+      return dialogRef.afterClosed();
+    })
+  );
+}
+```
+
+## Example: Complete Dialog Flow
+
+```typescript
+// 1. User clicks on a movie card
+onMovieClick(movie: MediaItem): void {
+  this.loadingCard = true;
+  
+  // 2. Open dialog through service
+  this.dialogService
+    .openMediaItem(window.innerWidth, movie, false)
+    .pipe(
+      finalize(() => this.loadingCard = false)
+    )
+    .subscribe({
+      next: (result) => {
+        // Dialog closed, handle result if needed
+        if (result?.action === 'addedToFavorites') {
+          this.toastrService.success('Added to favorites');
+        }
+      },
+      error: (error) => {
+        this.toastrService.error('Failed to load movie details');
+      }
+    });
+}
+```
+
+## Responsive Design
+
+Dialogs adapt to different screen sizes:
+
+```typescript
+// Desktop: Fixed width
+width: '800px'
+
+// Mobile: Full width with padding
+width: '95vw'
+
+// Always respect max width
+maxWidth: '95vw'
+```
+
+## Error Handling
+
+<AccordionGroup>
+  <Accordion title="Missing Poster Image">
+    When the poster image fails to load or is "N/A":
+    
+    ```typescript
+    onImageError(event: Event) {
+      const target = event.target as HTMLImageElement;
+      target.src = 'assets/images/no_poster.jpg';
+    }
+    ```
+    
+    The fallback image is displayed instead.
+  </Accordion>
+
+  <Accordion title="No Trailer Available">
+    When `youtubeURLTrailer` is undefined or null:
+    
+    ```typescript
+    playTrailer(): void {
+      if (!this.data.response.youtubeURLTrailer) return;
+      // Only open dialog if trailer exists
+    }
+    ```
+    
+    The play button should be hidden in the template when no trailer is available.
+  </Accordion>
+
+  <Accordion title="Failed to Load Details">
+    If the OMDB API fails to return details:
+    
+    ```typescript
+    .subscribe({
+      error: (error) => {
+        this.toastrService.error('Failed to load movie details');
+        this.loadingCard = false;
+      }
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="Invalid YouTube URL">
+    If the YouTube URL doesn't match the regex pattern:
+    
+    ```typescript
+    private extractYouTubeId(url: string): string {
+      const regExp = /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/))([\w-]{11})/;
+      const match = url.match(regExp);
+      return match && match[1] ? match[1] : ''; // Returns empty string if no match
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Testing Dialog Components
+
+Example test setup for the media dialog:
+
+```typescript src/app/shared/components/movie-dialog/movie-dialog.component.spec.ts
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { MediaItemDialogComponent } from './movie-dialog.component';
+import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
+import { ToastrModule } from 'ngx-toastr';
+import { HttpClientModule } from '@angular/common/http';
+import { MatIconModule } from '@angular/material/icon';
+
+describe('MediaItemDialogComponent', () => {
+  let component: MediaItemDialogComponent;
+  let fixture: ComponentFixture<MediaItemDialogComponent>;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      declarations: [MediaItemDialogComponent],
+      imports: [
+        MatDialogModule, 
+        ToastrModule.forRoot(),
+        HttpClientModule,
+        MatIconModule
+      ],
+      providers: [
+        { provide: MatDialogRef, useValue: {} },
+        { 
+          provide: MAT_DIALOG_DATA, 
+          useValue: {
+            response: {
+              Title: 'Test Movie',
+              Year: '2020',
+              Poster: 'N/A',
+              Director: 'Test Director',
+              Actors: 'Actor 1, Actor 2',
+              Plot: 'A test plot',
+              Genre: 'Drama',
+              Language: 'English',
+              Country: 'USA',
+              Runtime: '120 min',
+              imdbRating: '8.5',
+              imdbVotes: '10,000'
+            },
+            fromFavoritesSection: false,
+            movie: {}
+          }
+        } 
+      ]
+    });
+    fixture = TestBed.createComponent(MediaItemDialogComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+});
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Sanitize YouTube URLs" icon="shield">
+    Always use `DomSanitizer.bypassSecurityTrustResourceUrl()` when embedding external content to prevent XSS attacks.
+  </Card>
+  
+  <Card title="Handle Missing Data" icon="exclamation-triangle">
+    Implement fallbacks for missing posters, trailers, and other optional fields to avoid broken UI.
+  </Card>
+  
+  <Card title="Responsive Dialogs" icon="mobile">
+    Adjust dialog width based on screen size for optimal mobile and desktop experiences.
+  </Card>
+  
+  <Card title="Loading States" icon="spinner">
+    Show loading indicators while fetching detailed information to improve perceived performance.
+  </Card>
+</CardGroup>
+
+## Related Files
+
+- `src/app/shared/components/movie-dialog/movie-dialog.component.ts` - Main details dialog
+- `src/app/shared/components/trailer-dialog/trailer-dialog.component.ts` - Trailer player dialog
+- `src/app/shared/services/dialog/dialog.service.ts` - Dialog management service
+- `src/app/shared/services/omdb/omdb.service.ts` - OMDB API service
+- `src/app/shared/models/movieDialogData.model.ts` - Dialog data interface
+- `src/app/shared/models/trailerDialogData.model.ts` - Trailer data interface

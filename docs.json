@@ -1,122 +1,135 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "ScreenPulse",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#E50914",
+    "light": "#FF6B6B",
+    "dark": "#B20710"
   },
-  "favicon": "/favicon.svg",
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/EduGese/ScreenPulse-frontApp"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/EduGese/ScreenPulse-frontApp"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Get Started",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Introduction",
+            "pages": ["introduction", "quickstart", "installation"]
+          },
+          {
+            "group": "Setup",
+            "pages": ["setup/environment", "setup/configuration", "setup/development"]
+          }
+        ]
+      },
+      {
+        "tab": "Components",
+        "groups": [
+          {
+            "group": "Layout",
+            "pages": ["components/layout/navbar", "components/layout/footer"]
+          },
+          {
+            "group": "Pages",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "components/pages/search",
+              "components/pages/favorites",
+              "components/pages/auth"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Shared Components",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "components/shared/movie-dialog",
+              "components/shared/trailer-dialog",
+              "components/shared/loading-spinner",
+              "components/shared/empty-state"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Core Concepts",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Architecture",
             "pages": [
-              "api-reference/introduction"
+              "concepts/architecture",
+              "concepts/module-structure",
+              "concepts/routing",
+              "concepts/lazy-loading"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "State Management",
+            "pages": ["concepts/rxjs", "concepts/services", "concepts/reactive-patterns"]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Features",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "guides/authentication",
+              "guides/search",
+              "guides/favorites",
+              "guides/media-details"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "guides/api-integration",
+              "guides/error-handling",
+              "guides/styling",
+              "guides/testing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Services",
+            "pages": [
+              "api/services/auth-service",
+              "api/services/omdb-service",
+              "api/services/favorites-service",
+              "api/services/user-service"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/media-item",
+              "api/models/auth-user",
+              "api/models/omdb-response"
+            ]
+          },
+          {
+            "group": "Guards & Interceptors",
+            "pages": [
+              "api/guards/auth-guard",
+              "api/interceptors/auth-interceptor",
+              "api/interceptors/error-interceptor"
             ]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

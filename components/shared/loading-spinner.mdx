@@ -1,0 +1,256 @@
+---
+title: 'Loading Spinner'
+description: 'Animated loading indicator with progress bar'
+icon: 'spinner'
+---
+
+## Overview
+
+The Loading Spinner component displays an indeterminate Material Design progress bar with a loading message. It's used throughout the application to indicate background operations and data fetching.
+
+**Location**: `src/app/shared/components/loading-spinner/loading-spinner.component.ts`
+
+## Key Features
+
+- **Simple API**: Single `visible` input controls display
+- **Material Design**: Uses Angular Material progress bar
+- **Icon Integration**: Hourglass icon for visual feedback
+- **Visibility Toggle**: CSS-based show/hide (maintains layout)
+
+## Component Structure
+
+```typescript
+@Component({
+  selector: 'app-loading-spinner',
+  templateUrl: './loading-spinner.component.html',
+  styleUrls: ['./loading-spinner.component.scss']
+})
+export class LoadingSpinnerComponent {
+  @Input() visible!: boolean;
+}
+```
+
+## Input Properties
+
+<ParamField path="visible" type="boolean" default="false">
+  Controls the visibility of the loading spinner. When `true`, the spinner and message are visible. When `false`, they are hidden.
+</ParamField>
+
+## Usage
+
+### Basic Usage
+
+```html
+<app-loading-spinner [visible]="isLoading"></app-loading-spinner>
+```
+
+### In Search Component
+
+```html
+<app-loading-spinner [visible]="searchState.searchOnProcess"></app-loading-spinner>
+```
+
+### In Favorites Component
+
+```html
+<app-loading-spinner [visible]="loadingCard"></app-loading-spinner>
+```
+
+### In Auth Component
+
+```html
+<app-loading-spinner [visible]="isAuthenticating"></app-loading-spinner>
+```
+
+## Template Structure
+
+```html
+<div class="loading-container" [style.visibility]="visible ? 'visible' : 'hidden'">
+  <h1 class="loading-text">
+    <mat-icon [inline]="true">hourglass_top</mat-icon>
+    Loading, please wait
+  </h1>
+  <mat-progress-bar mode="indeterminate" color="accent">Loading</mat-progress-bar>
+</div>
+```
+
+## Visual Elements
+
+### Loading Message
+- **Icon**: `hourglass_top` Material icon
+- **Text**: "Loading, please wait"
+- **Inline Icon**: Icon displayed inline with text
+
+### Progress Bar
+- **Mode**: `indeterminate` (continuous animation)
+- **Color**: `accent` (uses theme accent color)
+- **Animation**: Smooth left-to-right movement
+
+## Visibility Behavior
+
+The component uses CSS `visibility` property instead of `*ngIf`:
+
+```html
+[style.visibility]="visible ? 'visible' : 'hidden'"
+```
+
+**Why `visibility` instead of `*ngIf`?**
+- Maintains space in layout when hidden
+- Prevents layout shift when showing/hiding
+- Smoother transitions
+
+## Common Use Cases
+
+### 1. API Data Fetching
+
+```typescript
+export class SearchComponent {
+  searchState: SearchState = {
+    // ...
+    searchOnProcess: false,
+  };
+
+  fetchMediaItems(): void {
+    this.searchState.searchOnProcess = true;
+    this.omdbService.fetchMediaItems(/* ... */)
+      .subscribe({
+        next: (response) => {
+          // Handle response
+          this.searchState.searchOnProcess = false;
+        },
+        error: (error) => {
+          // Handle error
+          this.searchState.searchOnProcess = false;
+        }
+      });
+  }
+}
+```
+
+### 2. Dialog Loading
+
+```typescript
+openMediaItem(mediaItem: MediaItem): void {
+  this.loadingCard = true;
+  this.dialogService
+    .openMediaItem(window.innerWidth, mediaItem, false)
+    .pipe(finalize(() => (this.loadingCard = false)))
+    .subscribe();
+}
+```
+
+### 3. Authentication
+
+```typescript
+handleLogin(formData: User): void {
+  this.isAuthenticating = true;
+  this.userService.login(formData)
+    .pipe(
+      finalize(() => {
+        this.isAuthenticating = false;
+      })
+    )
+    .subscribe(/* ... */);
+}
+```
+
+### 4. Initial Page Load
+
+```typescript
+ngOnInit(): void {
+  this.isLoadingFavorites = true;
+  this.loadAllFavorites();
+}
+
+loadAllFavorites(): void {
+  this.favoritesService.getFavorites(/* ... */)
+    .pipe(
+      finalize(() => {
+        this.isLoadingFavorites = false;
+      })
+    )
+    .subscribe(/* ... */);
+}
+```
+
+## Best Practices
+
+### Always Use with finalize
+
+Ensure the spinner is hidden even if the operation fails:
+
+```typescript
+this.service.getData()
+  .pipe(
+    finalize(() => this.isLoading = false)  // Always executes
+  )
+  .subscribe({
+    next: (data) => { /* ... */ },
+    error: (error) => { /* ... */ }
+  });
+```
+
+### Initialize Loading State
+
+Set loading to `true` before starting async operations:
+
+```typescript
+loadData(): void {
+  this.isLoading = true;  // Set BEFORE the call
+  this.service.getData()
+    .pipe(finalize(() => this.isLoading = false))
+    .subscribe();
+}
+```
+
+### Use Conditional Display
+
+Only show spinner when there's actual loading:
+
+```html
+<!-- Good: Conditional -->
+<app-loading-spinner [visible]="isLoading"></app-loading-spinner>
+
+<!-- Bad: Always visible -->
+<app-loading-spinner [visible]="true"></app-loading-spinner>
+```
+
+## Styling Customization
+
+The component uses scoped styles in `loading-spinner.component.scss`:
+
+```scss
+.loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+}
+
+.loading-text {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+```
+
+## Dependencies
+
+- **@angular/material/progress-bar**: Indeterminate progress bar
+- **@angular/material/icon**: Hourglass icon
+
+## Accessibility
+
+Consider adding ARIA attributes for better accessibility:
+
+```html
+<div 
+  class="loading-container" 
+  [style.visibility]="visible ? 'visible' : 'hidden'"
+  role="status"
+  aria-live="polite"
+  [attr.aria-hidden]="!visible">
+  <!-- content -->
+</div>
+```

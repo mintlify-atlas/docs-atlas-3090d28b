@@ -1,0 +1,223 @@
+---
+title: 'OmdbService'
+description: 'Service for fetching media information from the OMDB API'
+icon: 'film'
+---
+
+## Overview
+
+The `OmdbService` provides methods to search for movies, TV series, and episodes through the OMDB API, and retrieve detailed information about specific media items.
+
+## Import
+
+```typescript
+import { OmdbService } from 'src/app/shared/services/omdb/omdb.service';
+import { OmdbResponse } from 'src/app/shared/models/omdbResponse.model';
+import { OmdbDetails } from 'src/app/shared/models/ombdDetails';
+```
+
+## Methods
+
+### fetchMediaItems
+
+Searches for media items (movies, series, episodes) based on title, type, year, and page number.
+
+```typescript
+fetchMediaItems(title: string, type: string, year: string, page: number): Observable<OmdbResponse>
+```
+
+<ParamField path="title" type="string" required>
+  The title to search for (will be trimmed automatically)
+</ParamField>
+
+<ParamField path="type" type="string" required>
+  The media type to filter by. Valid values: `'movie'`, `'series'`, `'episode'`, or empty string for all types
+</ParamField>
+
+<ParamField path="year" type="string" required>
+  The release year to filter by, or empty string for all years
+</ParamField>
+
+<ParamField path="page" type="number" required>
+  The page number for paginated results (starts at 1)
+</ParamField>
+
+<ResponseField name="return" type="Observable<OmdbResponse>">
+  Observable that emits an OmdbResponse containing search results
+</ResponseField>
+
+**Example:**
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { OmdbService } from 'src/app/shared/services/omdb/omdb.service';
+
+@Component({
+  selector: 'app-search',
+  templateUrl: './search.component.html'
+})
+export class SearchComponent {
+  constructor(private omdbService: OmdbService) {}
+
+  searchMovies() {
+    this.omdbService.fetchMediaItems('Inception', 'movie', '2010', 1)
+      .subscribe({
+        next: (response) => {
+          if (response.Response === 'True') {
+            console.log('Found items:', response.Search);
+            console.log('Total results:', response.totalResults);
+          } else {
+            console.log('Error:', response.Error);
+          }
+        },
+        error: (error) => {
+          console.error('Search failed:', error);
+        }
+      });
+  }
+
+  searchAllMedia(searchTerm: string, pageNumber: number) {
+    // Search for all media types from all years
+    this.omdbService.fetchMediaItems(searchTerm, '', '', pageNumber)
+      .subscribe(response => {
+        // Handle response
+      });
+  }
+}
+```
+
+---
+
+### getMediaItemInfo
+
+Retrieves detailed information about a specific media item using its IMDb ID.
+
+```typescript
+getMediaItemInfo(imdbId: string): Observable<OmdbDetails>
+```
+
+<ParamField path="imdbId" type="string" required>
+  The IMDb ID of the media item (e.g., 'tt1375666')
+</ParamField>
+
+<ResponseField name="return" type="Observable<OmdbDetails>">
+  Observable that emits detailed information about the media item
+</ResponseField>
+
+**Example:**
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { OmdbService } from 'src/app/shared/services/omdb/omdb.service';
+import { OmdbDetails } from 'src/app/shared/models/ombdDetails';
+
+@Component({
+  selector: 'app-media-details',
+  templateUrl: './media-details.component.html'
+})
+export class MediaDetailsComponent implements OnInit {
+  mediaDetails: OmdbDetails | null = null;
+
+  constructor(private omdbService: OmdbService) {}
+
+  ngOnInit() {
+    const imdbId = 'tt1375666'; // Inception
+    
+    this.omdbService.getMediaItemInfo(imdbId).subscribe({
+      next: (details) => {
+        this.mediaDetails = details;
+        console.log('Title:', details.Title);
+        console.log('Plot:', details.Plot);
+        console.log('Director:', details.Director);
+        console.log('Ratings:', details.Ratings);
+        console.log('Trailer URL:', details.youtubeURLTrailer);
+      },
+      error: (error) => {
+        console.error('Failed to fetch details:', error);
+      }
+    });
+  }
+}
+```
+
+## HTTP Parameters
+
+The `fetchMediaItems` method sends the following HTTP query parameters:
+
+- `title` - The search title (trimmed)
+- `type` - Media type filter
+- `year` - Release year filter
+- `page` - Page number for pagination
+
+## Environment Configuration
+
+The service uses `environment.serverSearchURL` from the environment configuration file:
+
+```typescript
+// environment.development.ts
+export const environment = {
+  serverSearchURL: 'http://localhost:3000/api/search'
+};
+```
+
+## Complete Usage Example
+
+```typescript
+import { Component } from '@angular/core';
+import { OmdbService } from 'src/app/shared/services/omdb/omdb.service';
+import { MediaItem } from 'src/app/shared/models/movie.model';
+import { OmdbDetails } from 'src/app/shared/models/ombdDetails';
+
+@Component({
+  selector: 'app-media-search',
+  templateUrl: './media-search.component.html'
+})
+export class MediaSearchComponent {
+  searchResults: MediaItem[] = [];
+  totalResults: number = 0;
+  currentPage: number = 1;
+  selectedMediaDetails: OmdbDetails | null = null;
+
+  constructor(private omdbService: OmdbService) {}
+
+  searchMedia(title: string, type: string, year: string) {
+    this.omdbService.fetchMediaItems(title, type, year, this.currentPage)
+      .subscribe({
+        next: (response) => {
+          if (response.Response === 'True' && response.Search) {
+            this.searchResults = response.Search;
+            this.totalResults = parseInt(response.totalResults || '0');
+          } else {
+            console.error('Search error:', response.Error);
+            this.searchResults = [];
+          }
+        },
+        error: (error) => {
+          console.error('HTTP error:', error);
+        }
+      });
+  }
+
+  viewDetails(imdbId: string) {
+    this.omdbService.getMediaItemInfo(imdbId).subscribe({
+      next: (details) => {
+        this.selectedMediaDetails = details;
+      },
+      error: (error) => {
+        console.error('Failed to load details:', error);
+      }
+    });
+  }
+
+  loadNextPage() {
+    this.currentPage++;
+    this.searchMedia('Batman', 'movie', '');
+  }
+}
+```
+
+## Related
+
+- [OmdbResponse Model](/api/models/omdb-response) - Search response structure
+- [OmdbDetails Model](/api/models/omdb-response) - Detailed media information structure
+- [MediaItem Model](/api/models/media-item) - Media item interface

@@ -1,0 +1,237 @@
+---
+title: 'Application Architecture'
+description: 'Understand the modular architecture of ScreenPulse'
+---
+
+ScreenPulse follows a **feature-based modular architecture** using Angular best practices. The application is organized into distinct modules with clear responsibilities and boundaries.
+
+## Directory Structure
+
+The application is structured into four main module categories:
+
+```
+src/app/
+├── core/              # Singleton services, guards, interceptors
+│   ├── guards/        # Route guards (AuthGuard)
+│   ├── interceptors/  # HTTP interceptors (AuthInterceptor, ErrorInterceptor)
+│   ├── services/      # Application-wide services (AuthService, UserService)
+│   └── constants/     # Global constants
+├── shared/            # Reusable components, directives, pipes
+│   ├── components/    # Shared UI components
+│   ├── directives/    # Custom directives
+│   ├── services/      # Shared services (OmdbService, FavoritesService)
+│   └── models/        # TypeScript interfaces and types
+├── layout/            # Layout components
+│   ├── navbar/        # Navigation bar
+│   └── footer/        # Footer
+└── pages/             # Feature modules (lazy-loaded)
+    ├── search/        # Search feature
+    ├── favorites/     # Favorites feature
+    └── auth/          # Authentication feature
+```
+
+## Module Organization
+
+### Root Module (AppModule)
+
+The root module bootstraps the application and imports core infrastructure:
+
+```typescript title="src/app/app.module.ts"
+import { NgModule } from '@angular/core';
+import { BrowserModule } from '@angular/platform-browser';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { HTTP_INTERCEPTORS, HttpClientModule } from '@angular/common/http'
+
+import { AppRoutingModule } from './app-routing.module';
+import { CoreModule } from './core/core.module';
+import { LayoutModule } from './layout/layout.module';
+import { AppComponent } from './app.component';
+import { ToastrModule } from 'ngx-toastr';
+import { ErrorInterceptor } from './core/interceptors/error.interceptor';
+import { AuthInterceptor } from './core/interceptors/auth.interceptor';
+
+@NgModule({
+  declarations: [AppComponent],
+  imports: [
+    BrowserModule,
+    AppRoutingModule,
+    CoreModule,
+    LayoutModule,
+    BrowserAnimationsModule,
+    HttpClientModule,
+    ToastrModule.forRoot()
+  ],
+  providers: [
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: AuthInterceptor,
+      multi: true,
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: ErrorInterceptor,
+      multi: true,
+    }
+  ],
+  bootstrap: [AppComponent]
+})
+export class AppModule { }
+```
+
+<Note>
+Notice how interceptors are registered using the `HTTP_INTERCEPTORS` token with `multi: true`. This allows multiple interceptors to process HTTP requests in sequence.
+</Note>
+
+### Feature Modules
+
+Feature modules encapsulate related functionality and are lazy-loaded for optimal performance:
+
+```typescript title="src/app/pages/search/search.module.ts"
+import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { SearchRoutingModule } from './search-routing.module';
+import { SearchComponent } from './page/search.component';
+import { SharedModule } from 'src/app/shared/shared.module';
+
+@NgModule({
+  declarations: [
+    SearchComponent,
+    SearchCoverComponent,
+    MediaItemResultsTableComponent,
+    CarouselComponent,
+    SearchBarComponent
+  ],
+  imports: [
+    CommonModule,
+    SearchRoutingModule,
+    SharedModule,
+    FormsModule,
+    ReactiveFormsModule,
+    ...MATERIAL_MODULES
+  ]
+})
+export class SearchModule { }
+```
+
+## Smart vs Presentational Components
+
+ScreenPulse follows the **container/presentational** component pattern:
+
+### Smart Components (Containers)
+
+Located in `pages/*/page/` directories, these components:
+- Manage state and business logic
+- Inject services
+- Handle routing and navigation
+- Orchestrate data flow
+
+```typescript title="src/app/pages/search/page/search.component.ts"
+export class SearchComponent {
+  searchState: SearchState = {
+    title: '',
+    type: 'all',
+    year: '',
+    currentPage: 1,
+    collection: [],
+    collectionSize: 0
+  };
+
+  constructor(
+    private omdbService: OmdbService,
+    private toastrService: ToastrService,
+    private favoritesService: FavoritesService,
+    private authService: AuthService,
+    private router: Router,
+    private dialogService: DialogService
+  ) { }
+
+  handleSubmit(filters: SearchFilters): void {
+    this.searchState = {
+      ...this.searchState,
+      ...filters,
+      currentPage: 1
+    };
+    this.fetchMediaItems();
+  }
+}
+```
+
+### Presentational Components
+
+Located in `pages/*/components/` and `shared/components/` directories, these components:
+- Receive data via `@Input()`
+- Emit events via `@Output()`
+- Contain minimal logic
+- Focus on UI rendering
+
+```typescript title="src/app/shared/components/loading-spinner/loading-spinner.component.ts"
+@Component({
+  selector: 'app-loading-spinner',
+  templateUrl: './loading-spinner.component.html'
+})
+export class LoadingSpinnerComponent {
+  @Input() message: string = 'Loading...';
+}
+```
+
+## Module Responsibilities
+
+<CardGroup cols={2}>
+  <Card title="CoreModule" icon="shield-halved">
+    Singleton services, guards, interceptors, and global configuration. Imported once in AppModule.
+  </Card>
+  <Card title="SharedModule" icon="share-nodes">
+    Reusable components, directives, pipes, and utilities. Imported by feature modules.
+  </Card>
+  <Card title="LayoutModule" icon="window-maximize">
+    Application shell components (navbar, footer). Imported in AppModule.
+  </Card>
+  <Card title="Feature Modules" icon="puzzle-piece">
+    Self-contained features (search, favorites, auth). Lazy-loaded via routing.
+  </Card>
+</CardGroup>
+
+## Dependency Injection
+
+Angular's dependency injection system manages service instances and component dependencies:
+
+```typescript title="src/app/core/services/auth.service.ts"
+@Injectable({
+  providedIn: 'root'  // Singleton service available application-wide
+})
+export class AuthService {
+  private userMailSubject = new BehaviorSubject<string | null>(null);
+  private userLoggedInSubject = new BehaviorSubject<boolean>(false);
+  
+  // Service logic...
+}
+```
+
+<Info>
+The `providedIn: 'root'` option creates a singleton service instance that's available throughout the application without needing to add it to a module's providers array.
+</Info>
+
+## Architecture Benefits
+
+1. **Modularity**: Features are isolated and can be developed independently
+2. **Lazy Loading**: Feature modules load on-demand, reducing initial bundle size
+3. **Reusability**: Shared components and services are used across features
+4. **Maintainability**: Clear separation of concerns makes code easier to understand
+5. **Scalability**: New features can be added without affecting existing code
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Module Structure" icon="sitemap" href="/concepts/module-structure">
+    Deep dive into CoreModule, SharedModule, and feature modules
+  </Card>
+  <Card title="Routing" icon="route" href="/concepts/routing">
+    Learn about lazy loading and route protection
+  </Card>
+  <Card title="Services" icon="gears" href="/concepts/services">
+    Understand service architecture and dependency injection
+  </Card>
+  <Card title="RxJS Patterns" icon="diagram-project" href="/concepts/rxjs">
+    Explore reactive programming with RxJS
+  </Card>
+</CardGroup>

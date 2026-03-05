@@ -1,0 +1,827 @@
+---
+title: 'Development Workflow'
+description: 'Master the ScreenPulse development process with Angular CLI, npm scripts, and Storybook'
+icon: 'code'
+---
+
+## Overview
+
+This guide covers the complete development workflow for ScreenPulse, including running the dev server, using npm scripts, working with Storybook for component development, and building for production.
+
+## Development Server
+
+### Starting the Server
+
+ScreenPulse uses Angular's development server with hot module replacement (HMR) for instant feedback:
+
+<CodeGroup>
+  ```bash npm
+  npm start
+  ```
+
+  ```bash Angular CLI
+  ng serve
+  ```
+
+  ```bash Verbose Output
+  ng serve --verbose
+  ```
+</CodeGroup>
+
+The server will:
+1. Compile TypeScript and SCSS
+2. Bundle the application
+3. Start the dev server on `http://localhost:4200/`
+4. Open your default browser (if configured)
+5. Watch for file changes
+
+<Note>
+  The initial compilation may take 10-30 seconds. Subsequent rebuilds are much faster (1-3 seconds) thanks to incremental compilation.
+</Note>
+
+### Development Server Options
+
+<ParamField path="--port" type="number" default="4200">
+  Run the server on a different port:
+  
+  ```bash
+  ng serve --port 4300
+  ```
+</ParamField>
+
+<ParamField path="--open" type="boolean" default="false">
+  Automatically open the browser:
+  
+  ```bash
+  ng serve --open
+  ```
+</ParamField>
+
+<ParamField path="--host" type="string" default="localhost">
+  Specify the host for the dev server:
+  
+  ```bash
+  ng serve --host 0.0.0.0
+  ```
+  
+  <Tip>
+    Use `--host 0.0.0.0` to access the app from other devices on your network.
+  </Tip>
+</ParamField>
+
+<ParamField path="--configuration" type="string" default="development">
+  Use a specific build configuration:
+  
+  ```bash
+  ng serve --configuration production
+  ```
+</ParamField>
+
+<ParamField path="--ssl" type="boolean" default="false">
+  Run server with HTTPS:
+  
+  ```bash
+  ng serve --ssl
+  ```
+</ParamField>
+
+### Hot Module Replacement (HMR)
+
+Angular's dev server automatically reloads changes:
+
+<Tabs>
+  <Tab title="TypeScript Changes">
+    **What happens:**
+    - TypeScript files are recompiled
+    - Changes are injected into the running app
+    - Browser refreshes automatically
+    - Application state is preserved when possible
+
+    **Example:**
+    ```typescript
+    // Edit a component
+    export class SearchComponent {
+      title = 'Search Movies'; // Change this
+    }
+    // Save → Browser updates in 1-2 seconds
+    ```
+  </Tab>
+
+  <Tab title="HTML Template Changes">
+    **What happens:**
+    - Template is recompiled
+    - Component is re-rendered
+    - Browser updates instantly
+
+    **Example:**
+    ```html
+    <!-- Edit a template -->
+    <h1>{{ title }}</h1>
+    <!-- Save → Browser updates immediately -->
+    ```
+  </Tab>
+
+  <Tab title="SCSS Style Changes">
+    **What happens:**
+    - SCSS is recompiled to CSS
+    - Styles are injected without full reload
+    - No page refresh needed
+
+    **Example:**
+    ```scss
+    .search-container {
+      background: #f0f0f0; // Change this
+    }
+    // Save → Styles update instantly
+    ```
+  </Tab>
+</Tabs>
+
+<Warning>
+  Changes to `angular.json`, `tsconfig.json`, or `package.json` require restarting the dev server.
+</Warning>
+
+## Available npm Scripts
+
+ScreenPulse includes several npm scripts defined in `package.json`:
+
+### Core Development Scripts
+
+```json package.json
+{
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "deploy": "ng build && firebase deploy --only hosting",
+    "lint": "ng lint",
+    "compodoc": "compodoc -p tsconfig.json -e json -d .",
+    "storybook": "ng run controlli-challenge:storybook",
+    "build-storybook": "ng run controlli-challenge:build-storybook"
+  }
+}
+```
+
+### Script Reference
+
+<AccordionGroup>
+  <Accordion title="npm start - Development Server">
+    **Command:** `npm start` or `npm run start`
+
+    **What it does:**
+    - Starts Angular dev server on port 4200
+    - Enables hot module replacement
+    - Watches for file changes
+    - Uses development configuration
+
+    **Use when:**
+    - Developing new features
+    - Testing changes locally
+    - Debugging issues
+
+    **Output:**
+    ```bash
+    ✔ Browser application bundle generation complete.
+    Initial Chunk Files   | Names         |  Raw Size
+    vendor.js            | vendor        |   2.45 MB |
+    polyfills.js         | polyfills     | 333.17 kB |
+    styles.css, styles.js| styles        | 231.31 kB |
+    main.js              | main          | 124.58 kB |
+    runtime.js           | runtime       |  12.85 kB |
+
+    ** Angular Live Development Server is listening on localhost:4200 **
+    ✔ Compiled successfully.
+    ```
+  </Accordion>
+
+  <Accordion title="npm run build - Production Build">
+    **Command:** `npm run build`
+
+    **What it does:**
+    - Compiles app for production
+    - Enables AOT compilation
+    - Minifies and optimizes code
+    - Generates output in `dist/controlli-challenge/`
+    - Uses production environment file
+
+    **Use when:**
+    - Preparing for deployment
+    - Testing production build
+    - Generating optimized bundle
+
+    **Output:**
+    ```bash
+    ✔ Browser application bundle generation complete.
+    ✔ Copying assets complete.
+    ✔ Index html generation complete.
+
+    Initial Chunk Files | Names         |  Raw Size
+    main.js             | main          | 245.17 kB |
+    polyfills.js        | polyfills     |  33.04 kB |
+    runtime.js          | runtime       |   1.02 kB |
+    styles.css          | styles        |  89.43 kB |
+
+    Output location: dist/controlli-challenge
+    ```
+
+    <Tip>
+      Production builds are 60-80% smaller than development builds due to optimization and tree-shaking.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="npm run watch - Continuous Build">
+    **Command:** `npm run watch`
+
+    **What it does:**
+    - Builds app in development mode
+    - Watches for file changes
+    - Rebuilds automatically
+    - Does NOT serve files (no HTTP server)
+
+    **Use when:**
+    - Testing build process
+    - Validating compilation
+    - CI/CD pipelines
+
+    **Example:**
+    ```bash
+    npm run watch
+    # Make changes to files
+    # Build automatically triggers
+    ```
+  </Accordion>
+
+  <Accordion title="npm test - Unit Tests">
+    **Command:** `npm test` or `npm run test`
+
+    **What it does:**
+    - Runs Jasmine unit tests
+    - Launches Karma test runner
+    - Opens Chrome browser for tests
+    - Watches for file changes
+    - Re-runs tests on change
+
+    **Use when:**
+    - Writing new tests
+    - Debugging failing tests
+    - Validating code changes
+
+    **Test Output:**
+    ```bash
+    Chrome Headless 120.0.0.0 (Mac OS 10.15.7): Executed 47 of 47 SUCCESS (0.892 secs / 0.765 secs)
+    TOTAL: 47 SUCCESS
+    ```
+
+    **Run tests once (for CI):**
+    ```bash
+    ng test --watch=false --browsers=ChromeHeadless
+    ```
+  </Accordion>
+
+  <Accordion title="npm run lint - Code Linting">
+    **Command:** `npm run lint`
+
+    **What it does:**
+    - Runs ESLint on TypeScript files
+    - Checks HTML templates
+    - Enforces code style rules
+    - Reports warnings and errors
+
+    **Use when:**
+    - Before committing code
+    - Fixing code quality issues
+    - Ensuring consistent style
+
+    **Configuration:** `eslint.config.js`
+
+    **Fix auto-fixable issues:**
+    ```bash
+    ng lint --fix
+    ```
+  </Accordion>
+
+  <Accordion title="npm run storybook - Component Development">
+    **Command:** `npm run storybook`
+
+    **What it does:**
+    - Launches Storybook dev server on port 6006
+    - Shows component documentation
+    - Provides interactive component playground
+    - Hot reloads on changes
+
+    **Use when:**
+    - Developing UI components in isolation
+    - Testing component variations
+    - Writing component documentation
+    - Showcasing component library
+
+    See [Storybook for Component Development](#storybook-for-component-development) below.
+  </Accordion>
+
+  <Accordion title="npm run build-storybook - Build Storybook">
+    **Command:** `npm run build-storybook`
+
+    **What it does:**
+    - Builds static Storybook site
+    - Outputs to `storybook-static/`
+    - Ready for deployment
+
+    **Use when:**
+    - Deploying component documentation
+    - Sharing with team
+    - Hosting on GitHub Pages
+
+    **Example:**
+    ```bash
+    npm run build-storybook
+    # Deploy to GitHub Pages
+    npx gh-pages -d storybook-static
+    ```
+  </Accordion>
+
+  <Accordion title="npm run deploy - Firebase Deployment">
+    **Command:** `npm run deploy`
+
+    **What it does:**
+    - Builds app for production
+    - Deploys to Firebase Hosting
+    - Updates live site at sreenpulse.web.app
+
+    **Prerequisites:**
+    - Firebase CLI installed: `npm install -g firebase-tools`
+    - Authenticated: `firebase login`
+    - Firebase project configured (see `.firebaserc`)
+
+    **Use when:**
+    - Deploying to production
+    - Publishing new releases
+
+    <Warning>
+      Only deploy after thorough testing. This updates the live production site.
+    </Warning>
+  </Accordion>
+
+  <Accordion title="npm run compodoc - Generate Documentation">
+    **Command:** `npm run compodoc`
+
+    **What it does:**
+    - Generates TypeScript code documentation
+    - Creates JSON output for Storybook
+    - Documents components, services, modules
+
+    **Use when:**
+    - Updating Storybook documentation
+    - Generating architecture diagrams
+
+    **Output:** `documentation.json`
+  </Accordion>
+</AccordionGroup>
+
+## Storybook for Component Development
+
+ScreenPulse uses Storybook 8.3.7 for component-driven development.
+
+### What is Storybook?
+
+Storybook is a tool for developing UI components in isolation. It allows you to:
+
+- Build components outside the main app
+- Test different states and props
+- Document component APIs
+- Share components with designers and stakeholders
+- Catch UI bugs early
+
+### Launching Storybook
+
+<CodeGroup>
+  ```bash npm
+  npm run storybook
+  ```
+
+  ```bash Angular CLI
+  ng run controlli-challenge:storybook
+  ```
+</CodeGroup>
+
+Storybook will open at `http://localhost:6006/`
+
+<Tip>
+  ScreenPulse's Storybook is deployed at [edugese.github.io/ScreenPulse-frontApp](https://edugese.github.io/ScreenPulse-frontApp/)
+</Tip>
+
+### Storybook Configuration
+
+Storybook configuration is in `.storybook/`:
+
+```
+.storybook/
+├── main.ts        # Storybook configuration
+├── preview.ts     # Global decorators and parameters
+└── tsconfig.json  # TypeScript config for Storybook
+```
+
+**Angular.json configuration:**
+
+```json angular.json
+{
+  "storybook": {
+    "builder": "@storybook/angular:start-storybook",
+    "options": {
+      "configDir": ".storybook",
+      "browserTarget": "controlli-challenge:build",
+      "compodoc": false,
+      "port": 6006
+    }
+  }
+}
+```
+
+### Writing Stories
+
+Create stories for your components in the `src/stories/` directory:
+
+```typescript button.stories.ts
+import { Meta, StoryObj } from '@storybook/angular';
+import { ButtonComponent } from '../app/shared/components/button/button.component';
+
+const meta: Meta<ButtonComponent> = {
+  title: 'Shared/Button',
+  component: ButtonComponent,
+  tags: ['autodocs'],
+  argTypes: {
+    variant: {
+      control: 'select',
+      options: ['primary', 'secondary', 'danger']
+    },
+    size: {
+      control: 'select',
+      options: ['small', 'medium', 'large']
+    }
+  }
+};
+
+export default meta;
+type Story = StoryObj<ButtonComponent>;
+
+export const Primary: Story = {
+  args: {
+    label: 'Click Me',
+    variant: 'primary',
+    size: 'medium'
+  }
+};
+
+export const Secondary: Story = {
+  args: {
+    label: 'Secondary Button',
+    variant: 'secondary',
+    size: 'medium'
+  }
+};
+
+export const Danger: Story = {
+  args: {
+    label: 'Delete',
+    variant: 'danger',
+    size: 'small'
+  }
+};
+```
+
+### Using Storybook
+
+<Steps>
+  <Step title="Browse Components">
+    Navigate through the component tree in the sidebar to see all available components.
+  </Step>
+
+  <Step title="Interact with Controls">
+    Use the Controls panel to change component props in real-time:
+    - Text inputs for strings
+    - Sliders for numbers
+    - Dropdowns for select options
+    - Toggles for booleans
+  </Step>
+
+  <Step title="View Documentation">
+    Click the "Docs" tab to see:
+    - Component API documentation
+    - Prop types and descriptions
+    - Usage examples
+    - Live component preview
+  </Step>
+
+  <Step title="Test Different States">
+    Create multiple stories to test:
+    - Loading states
+    - Error states
+    - Empty states
+    - Different data variations
+  </Step>
+</Steps>
+
+<Note>
+  Storybook runs independently from the main app, so you can develop components without worrying about routing, authentication, or other app concerns.
+</Note>
+
+## Building for Production
+
+### Production Build Command
+
+<CodeGroup>
+  ```bash npm
+  npm run build
+  ```
+
+  ```bash Angular CLI
+  ng build
+  ```
+
+  ```bash Explicit Configuration
+  ng build --configuration production
+  ```
+</CodeGroup>
+
+### Build Output
+
+Production builds are output to `dist/controlli-challenge/`:
+
+```
+dist/controlli-challenge/
+├── index.html              # Entry HTML file
+├── main.[hash].js          # Main application bundle
+├── polyfills.[hash].js     # Browser polyfills
+├── runtime.[hash].js       # Angular runtime
+├── styles.[hash].css       # Compiled styles
+├── assets/                 # Static assets
+│   ├── images/
+│   └── fonts/
+└── favicon.ico
+```
+
+<Note>
+  File names include content hashes (e.g., `main.abc123.js`) for cache busting. The hash changes only when the file content changes.
+</Note>
+
+### Build Optimizations
+
+Production builds include:
+
+<CardGroup cols={2}>
+  <Card title="AOT Compilation" icon="bolt">
+    Ahead-of-Time compilation converts templates to JavaScript at build time, reducing bundle size and improving performance.
+  </Card>
+
+  <Card title="Tree Shaking" icon="tree">
+    Removes unused code from bundles, significantly reducing file size.
+  </Card>
+
+  <Card title="Minification" icon="compress">
+    Removes whitespace, shortens variable names, and compresses code.
+  </Card>
+
+  <Card title="Bundling" icon="box">
+    Combines multiple files into fewer bundles for faster loading.
+  </Card>
+</CardGroup>
+
+### Serve Production Build Locally
+
+Test the production build before deploying:
+
+```bash
+# Build for production
+npm run build
+
+# Serve with http-server
+npx http-server dist/controlli-challenge -p 8080 -o
+
+# Or with Angular's built-in server
+ng serve --configuration production
+```
+
+Open `http://localhost:8080/` to test.
+
+<Warning>
+  The production build connects to the production API at `screenpulse-api.onrender.com`, not your local backend.
+</Warning>
+
+### Build Performance
+
+Typical build times:
+
+- **Development build:** 10-30 seconds (initial), 1-3 seconds (incremental)
+- **Production build:** 30-60 seconds (includes optimization)
+
+**Improve build performance:**
+
+```bash
+# Increase Node.js memory
+export NODE_OPTIONS="--max-old-space-size=4096"
+npm run build
+
+# Use production config with source maps (for debugging)
+ng build --configuration production --source-map
+```
+
+## Development Best Practices
+
+<AccordionGroup>
+  <Accordion title="Use TypeScript Strict Mode">
+    ScreenPulse uses TypeScript 5.1 with strict type checking:
+
+    ```json tsconfig.json
+    {
+      "compilerOptions": {
+        "strict": true,
+        "noImplicitAny": true,
+        "strictNullChecks": true
+      }
+    }
+    ```
+
+    Benefits:
+    - Catch errors at compile time
+    - Better IDE support
+    - Safer refactoring
+  </Accordion>
+
+  <Accordion title="Run Linter Before Committing">
+    Always lint your code before committing:
+
+    ```bash
+    # Check for issues
+    npm run lint
+
+    # Auto-fix issues
+    ng lint --fix
+
+    # Stage fixed files
+    git add .
+    git commit -m "fix: resolve linting issues"
+    ```
+  </Accordion>
+
+  <Accordion title="Test Changes in Both Modes">
+    Test your changes in both development and production:
+
+    ```bash
+    # Test in development
+    npm start
+
+    # Test production build
+    npm run build
+    npx http-server dist/controlli-challenge
+    ```
+
+    Production builds may reveal issues not visible in development.
+  </Accordion>
+
+  <Accordion title="Use Component-Driven Development">
+    Develop components in isolation using Storybook:
+
+    1. Create component
+    2. Write story for component
+    3. Test all states in Storybook
+    4. Integrate into app
+    5. Write unit tests
+
+    This approach leads to more reusable, testable components.
+  </Accordion>
+
+  <Accordion title="Keep Dev Server Running">
+    Keep `npm start` running while developing:
+
+    - Fast hot reload on changes
+    - Immediate feedback
+    - Catch compilation errors quickly
+
+    Restart only when changing:
+    - `angular.json`
+    - `tsconfig.json`
+    - `package.json`
+    - Environment files
+  </Accordion>
+</AccordionGroup>
+
+## Debugging Tips
+
+### Browser DevTools
+
+<Tabs>
+  <Tab title="Angular DevTools">
+    Install Angular DevTools extension:
+    - [Chrome](https://chrome.google.com/webstore/detail/angular-devtools/ienfalfjdbdpebioblfackkekamfmbnh)
+    - [Firefox](https://addons.mozilla.org/en-US/firefox/addon/angular-devtools/)
+
+    Features:
+    - Component tree inspector
+    - Change detection profiler
+    - Injector hierarchy
+    - Router debugging
+  </Tab>
+
+  <Tab title="Console Debugging">
+    Use browser console to debug:
+
+    ```typescript
+    // Add debug logs
+    console.log('Component initialized:', this.data);
+    console.table(this.items);
+    console.group('API Call');
+    console.log('Request:', request);
+    console.log('Response:', response);
+    console.groupEnd();
+    ```
+
+    ```typescript
+    // Add breakpoints
+    debugger; // Pauses execution here
+    ```
+  </Tab>
+
+  <Tab title="Network Panel">
+    Monitor API calls in Network panel:
+
+    1. Open DevTools (F12)
+    2. Go to Network tab
+    3. Filter by XHR/Fetch
+    4. Click requests to see:
+       - Request headers
+       - Response data
+       - Timing information
+       - Cookies
+  </Tab>
+
+  <Tab title="Source Maps">
+    Development builds include source maps for debugging:
+
+    - Original TypeScript code in Sources panel
+    - Set breakpoints in TypeScript files
+    - Step through original code
+
+    **Enable in production:**
+    ```bash
+    ng build --source-map
+    ```
+  </Tab>
+</Tabs>
+
+### VS Code Debugging
+
+ScreenPulse includes VS Code debug configuration in `.vscode/launch.json`.
+
+To debug:
+
+<Steps>
+  <Step title="Start Dev Server">
+    ```bash
+    npm start
+    ```
+  </Step>
+
+  <Step title="Set Breakpoints">
+    Click in the gutter next to line numbers to set breakpoints.
+  </Step>
+
+  <Step title="Start Debugging">
+    Press F5 or click Run → Start Debugging
+  </Step>
+
+  <Step title="Debug in VS Code">
+    - Step through code
+    - Inspect variables
+    - Evaluate expressions
+    - View call stack
+  </Step>
+</Steps>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Architecture Overview" icon="sitemap" href="/concepts/architecture">
+    Learn about ScreenPulse's application structure
+  </Card>
+  
+  <Card title="Component Guide" icon="puzzle-piece" href="/components/pages/search">
+    Understand the component library
+  </Card>
+  
+  <Card title="API Integration" icon="plug" href="/guides/api-integration">
+    Learn how to work with the backend API
+  </Card>
+  
+  <Card title="Testing Guide" icon="flask" href="/guides/testing">
+    Write and run tests for your code
+  </Card>
+</CardGroup>
+
+## Resources
+
+- **Live Demo:** [sreenpulse.web.app](https://sreenpulse.web.app/)
+- **Storybook:** [Component Documentation](https://edugese.github.io/ScreenPulse-frontApp/)
+- **Backend API:** [GitHub Repository](https://github.com/EduGese/ScreenPulse-backend-Api)
+- **Angular Docs:** [angular.io/docs](https://angular.io/docs)
+- **Storybook Docs:** [storybook.js.org](https://storybook.js.org/)

@@ -1,0 +1,578 @@
+---
+title: 'API Integration'
+description: 'Learn how to integrate with the backend API and OMDB proxy, including HTTP client configuration, request patterns, and authentication'
+icon: 'network-wired'
+---
+
+## Overview
+
+ScreenPulse integrates with a backend API built with Node.js/Express that serves as a proxy for the OMDB API and manages user authentication and favorites. All API communication uses Angular's `HttpClient` with JWT authentication.
+
+## Environment Configuration
+
+API endpoints are configured in environment files:
+
+```typescript src/environments/environment.development.ts
+export const environment = {
+    serverFavoritesURL : 'http://localhost:9000/api/favorites',
+    serverSearchURL : 'http://localhost:9000/api/omdb',
+    serverUserURL : 'http://localhost:9000/api/user'
+};
+```
+
+### Environment Files
+
+- **environment.development.ts** - Development environment (localhost)
+- **environment.ts** - Default environment
+- **environments.production.ts** - Production environment
+
+<Note>
+  Always use environment variables instead of hardcoding URLs to support different deployment environments.
+</Note>
+
+## API Endpoints Structure
+
+### User Authentication API
+
+```
+POST /api/user/login
+POST /api/user/register
+```
+
+**Base URL:** `environment.serverUserURL`
+
+### Favorites API
+
+```
+GET    /api/favorites          # Get user's favorites
+POST   /api/favorites          # Add to favorites
+PATCH  /api/favorites/:id      # Update favorite
+DELETE /api/favorites/:id      # Delete favorite
+```
+
+**Base URL:** `environment.serverFavoritesURL`
+
+### OMDB Search API
+
+```
+GET /api/omdb?title=...&type=...&year=...&page=...  # Search movies
+GET /api/omdb/:imdbId                                # Get movie details
+```
+
+**Base URL:** `environment.serverSearchURL`
+
+## HTTP Client Configuration
+
+All services inject Angular's `HttpClient`:
+
+```typescript
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class MyService {
+  constructor(private http: HttpClient) { }
+}
+```
+
+## Authentication API Integration
+
+### Login Request
+
+```typescript src/app/core/services/user.service.ts
+login(formData: User): Observable<LoginResponse> {
+  const body = formData;
+  const httpOptions = {
+    headers: new HttpHeaders({
+      'Content-Type': 'application/json',
+    }),
+  };
+  return this.http.post<LoginResponse>(`${this.baseUrl}/login`, body, httpOptions)
+}
+```
+
+**Request:**
+```json
+POST /api/user/login
+Content-Type: application/json
+
+{
+  "email": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+**Response:**
+```json
+{
+  "user": {
+    "email": "user@example.com",
+    "name": "John Doe",
+    "id": "507f1f77bcf86cd799439011"
+  },
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
+
+### Registration Request
+
+```typescript src/app/core/services/user.service.ts
+register(formData: User): Observable<User> {
+  const body = formData;
+  const httpOptions = {
+    headers: new HttpHeaders({
+      'Content-Type': 'application/json',
+    }),
+  };
+  return this.http.post<RegisterResponse>(`${this.baseUrl}/register`, body, httpOptions)
+}
+```
+
+**Request:**
+```json
+POST /api/user/register
+Content-Type: application/json
+
+{
+  "name": "John Doe",
+  "email": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+**Response:**
+```json
+{
+  "name": "John Doe",
+  "email": "user@example.com",
+  "id": "507f1f77bcf86cd799439011"
+}
+```
+
+## Authenticated Requests
+
+All favorites API requests require JWT authentication:
+
+```typescript src/app/shared/services/favorites/favorites.service.ts
+addToFavorites(movie: MediaItem): Observable<MediaItem> {
+  const token = this.authService.getAuthToken();
+  const options = {
+    headers: new HttpHeaders({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }),
+  };
+  return this.http.post<MediaItem>(this.baseUrl, movie, options)
+}
+```
+
+### Authorization Header Pattern
+
+```typescript
+const token = this.authService.getAuthToken();
+const options = {
+  headers: new HttpHeaders({
+    'Authorization': `Bearer ${token}`
+  })
+};
+```
+
+<Warning>
+  Always retrieve the token from `AuthService` instead of directly from session storage to ensure consistency.
+</Warning>
+
+## Query Parameters
+
+Use `HttpParams` to build query strings:
+
+```typescript src/app/shared/services/omdb/omdb.service.ts
+fetchMediaItems(title: string, type: string, year: string, page: number): Observable<OmdbResponse> {
+  const options = {
+    params: new HttpParams()
+      .set('title', title.trim())
+      .set('type', type)
+      .set('year', year)
+      .set('page', page.toString())
+  };
+  return this.http.get<OmdbResponse>(`${environment.serverSearchURL}`, options)
+}
+```
+
+**Generated URL:**
+```
+GET /api/omdb?title=matrix&type=movie&year=1999&page=1
+```
+
+### Conditional Parameters
+
+```typescript src/app/shared/services/favorites/favorites.service.ts
+getFavorites(
+  currentPage: number,
+  pageSize: number,
+  sortField?: string,
+  sortOrder?: number,
+  searchTerm?: string,
+  mediaType?: string,
+): Observable<FavoritesResponse> {
+  const token = this.authService.getAuthToken();
+  let params = new HttpParams()
+    .set('page', currentPage.toString())
+    .set('pageSize', pageSize.toString());
+  
+  // Add optional parameters only if provided
+  if (sortField) params = params.set('sortField', sortField);
+  if (sortOrder) params = params.set('sortOrder', sortOrder.toString());
+  if (mediaType && mediaType !== 'all') params = params.set('type', mediaType);
+  if (searchTerm) params = params.set('searchTerm', searchTerm);
+
+  const options = {
+    headers: new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    }),
+    params: params
+  };
+
+  return this.http.get<FavoritesResponse>(this.baseUrl, options);
+}
+```
+
+## Request/Response Patterns
+
+### GET Request
+
+```typescript
+// Simple GET
+this.http.get<ResponseType>(`${baseUrl}/endpoint`)
+
+// GET with query parameters
+this.http.get<ResponseType>(`${baseUrl}/endpoint`, {
+  params: new HttpParams().set('key', 'value')
+})
+
+// GET with authentication
+this.http.get<ResponseType>(`${baseUrl}/endpoint`, {
+  headers: new HttpHeaders({
+    'Authorization': `Bearer ${token}`
+  })
+})
+```
+
+### POST Request
+
+```typescript
+// POST with JSON body
+this.http.post<ResponseType>(`${baseUrl}/endpoint`, requestBody, {
+  headers: new HttpHeaders({
+    'Content-Type': 'application/json'
+  })
+})
+
+// POST with authentication
+this.http.post<ResponseType>(`${baseUrl}/endpoint`, requestBody, {
+  headers: new HttpHeaders({
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  })
+})
+```
+
+### PATCH Request
+
+```typescript src/app/shared/services/favorites/favorites.service.ts
+updateFavorite(mediaItem: MediaItem): Observable<MediaItem> {
+  const token = this.authService.getAuthToken();
+  const body = {
+    description: mediaItem.description
+  }
+  const options = {
+    headers: new HttpHeaders({
+      'Content-Type': 'application/json',
+       'Authorization': `Bearer ${token}`
+    }),
+  };
+  return this.http.patch<MediaItem>(`${this.baseUrl}/${mediaItem._id}`, body, options)
+}
+```
+
+### DELETE Request
+
+```typescript src/app/shared/services/favorites/favorites.service.ts
+deleteMediaItem(mediaId: string): Observable<DeleteResponse> {
+  const token = this.authService.getAuthToken();
+  const options = {
+    headers: new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    })
+  };
+  return this.http.delete<DeleteResponse>(`${this.baseUrl}/${mediaId}`, options);
+}
+```
+
+## HTTP Interceptors
+
+### Auth Interceptor
+
+Automatically adds JWT token to requests:
+
+```typescript src/app/core/interceptors/auth.interceptor.ts
+import { AuthService } from './../services/auth.service';
+import { Injectable } from '@angular/core';
+import { HttpEvent, HttpInterceptor, HttpHandler, HttpRequest, HttpErrorResponse } from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { Router } from '@angular/router';
+
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  constructor(private router: Router, private authService: AuthService) {}
+
+  intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    const token = this.authService.getAuthToken();
+    let authReq = req;
+    if (token) {
+      authReq = req.clone({
+        setHeaders: { Authorization: `Bearer ${token}` }
+      });
+    }
+    return next.handle(authReq).pipe(
+      catchError((error: HttpErrorResponse) => {
+        if (error.status === 401 && error.message === 'Session expired. Please login again') {
+          this.authService.logOut();
+          this.router.navigate(['/auth/login']);
+        }
+        return throwError(() => error);
+      })
+    );
+  }
+}
+```
+
+### Error Interceptor
+
+Transforms HTTP errors into user-friendly messages:
+
+```typescript src/app/core/interceptors/error.interceptor.ts
+import { Injectable } from '@angular/core';
+import {
+  HttpEvent,
+  HttpInterceptor,
+  HttpHandler,
+  HttpRequest,
+  HttpErrorResponse
+} from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+
+@Injectable()
+export class ErrorInterceptor implements HttpInterceptor {
+  intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    return next.handle(req).pipe(
+      catchError((error: HttpErrorResponse) => {
+        let message = 'An unknown error occurred.';
+        switch (error.status) {
+          case 0:
+            message = 'Cannot connect to server. Please check your internet connection';
+            break;
+          case 401:
+            message = 'Unauthorized access. Please try it again';
+             if (error.error.code === 'AUTH_TOKEN_EXPIRED') {
+              message = 'Session expired. Please login again';
+            }
+            break;
+          case 404:
+            message = 'The favorite you are trying to delete could not be found in your list. Please try again later.';
+            break;
+          case 409:
+            if (error.error.code === 'USER_EXISTS') {
+              message = 'User with this email already exists';
+            }
+            if (error.error.code === 'FAVORITE_EXISTS') {
+              message = 'Media item already in favorites';
+            }
+            break;
+          default:
+            message = 'An unexpected error occurred. Please try again later';
+            break;
+        }
+
+        return throwError(() => ({
+          message,
+          status: error.status,
+        }));
+      })
+    );
+  }
+}
+```
+
+## Registering Interceptors
+
+Register interceptors in your app module:
+
+```typescript
+import { HTTP_INTERCEPTORS } from '@angular/common/http';
+import { AuthInterceptor } from './core/interceptors/auth.interceptor';
+import { ErrorInterceptor } from './core/interceptors/error.interceptor';
+
+@NgModule({
+  providers: [
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: AuthInterceptor,
+      multi: true
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: ErrorInterceptor,
+      multi: true
+    }
+  ]
+})
+export class AppModule { }
+```
+
+## OMDB API Proxy
+
+The backend proxies requests to the OMDB API to:
+- Hide the API key from the frontend
+- Add caching and rate limiting
+- Transform responses if needed
+- Add YouTube trailer URLs
+
+### Why Use a Proxy?
+
+<CardGroup cols={2}>
+  <Card title="Security" icon="lock">
+    Keep API keys secret on the server instead of exposing them in frontend code.
+  </Card>
+  
+  <Card title="Rate Limiting" icon="gauge">
+    Control request frequency to avoid hitting OMDB API rate limits.
+  </Card>
+  
+  <Card title="Caching" icon="database">
+    Cache frequently requested movies to reduce API calls and improve performance.
+  </Card>
+  
+  <Card title="Enhanced Data" icon="plus">
+    Add additional data like YouTube trailer URLs that aren't in the OMDB response.
+  </Card>
+</CardGroup>
+
+## Error Response Format
+
+All API errors are transformed into a consistent format:
+
+```typescript
+{
+  message: string,  // User-friendly error message
+  status: number    // HTTP status code
+}
+```
+
+## Complete Service Example
+
+```typescript
+import { Injectable } from '@angular/core';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
+import { Observable } from 'rxjs';
+import { environment } from 'src/environments/environment.development';
+import { AuthService } from 'src/app/core/services/auth.service';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class MyApiService {
+  private baseUrl = environment.serverFavoritesURL;
+
+  constructor(
+    private http: HttpClient,
+    private authService: AuthService
+  ) { }
+
+  // GET with auth and query params
+  getItems(page: number, filter?: string): Observable<any> {
+    const token = this.authService.getAuthToken();
+    let params = new HttpParams().set('page', page.toString());
+    if (filter) params = params.set('filter', filter);
+
+    const options = {
+      headers: new HttpHeaders({
+        'Authorization': `Bearer ${token}`
+      }),
+      params: params
+    };
+
+    return this.http.get(`${this.baseUrl}`, options);
+  }
+
+  // POST with auth and body
+  createItem(item: any): Observable<any> {
+    const token = this.authService.getAuthToken();
+    const options = {
+      headers: new HttpHeaders({
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      })
+    };
+
+    return this.http.post(`${this.baseUrl}`, item, options);
+  }
+
+  // PATCH with auth
+  updateItem(id: string, updates: any): Observable<any> {
+    const token = this.authService.getAuthToken();
+    const options = {
+      headers: new HttpHeaders({
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      })
+    };
+
+    return this.http.patch(`${this.baseUrl}/${id}`, updates, options);
+  }
+
+  // DELETE with auth
+  deleteItem(id: string): Observable<any> {
+    const token = this.authService.getAuthToken();
+    const options = {
+      headers: new HttpHeaders({
+        'Authorization': `Bearer ${token}`
+      })
+    };
+
+    return this.http.delete(`${this.baseUrl}/${id}`, options);
+  }
+}
+```
+
+## Best Practices
+
+<CardGroup cols={2}>
+  <Card title="Use Environment Variables" icon="gear">
+    Never hardcode API URLs. Always use environment configuration for flexibility across environments.
+  </Card>
+  
+  <Card title="Type Your Responses" icon="code">
+    Use TypeScript interfaces for request and response types to catch errors at compile time.
+  </Card>
+  
+  <Card title="Centralize Authentication" icon="key">
+    Use interceptors to automatically add auth tokens instead of manually adding them to each request.
+  </Card>
+  
+  <Card title="Handle Errors Consistently" icon="exclamation-circle">
+    Use error interceptors to transform all errors into a consistent format for easier handling.
+  </Card>
+</CardGroup>
+
+## Related Files
+
+- `src/environments/environment.development.ts` - API endpoint configuration
+- `src/app/core/services/user.service.ts` - User authentication API
+- `src/app/shared/services/favorites/favorites.service.ts` - Favorites CRUD API
+- `src/app/shared/services/omdb/omdb.service.ts` - OMDB search API
+- `src/app/core/interceptors/auth.interceptor.ts` - JWT authentication interceptor
+- `src/app/core/interceptors/error.interceptor.ts` - Error handling interceptor

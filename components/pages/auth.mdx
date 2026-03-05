@@ -1,0 +1,290 @@
+---
+title: 'Auth Page'
+description: 'Unified authentication page for login and registration'
+icon: 'lock'
+---
+
+## Overview
+
+The Auth page provides a unified authentication interface that handles both login and registration flows. The form type is determined by the route data, and the component manages form submission and navigation.
+
+**Location**: `src/app/pages/auth/page/auth-page.component.ts`
+
+## Key Features
+
+- **Dual Mode**: Supports both login and registration
+- **Route-Based Configuration**: Form type determined by route data
+- **Form Validation**: Client-side validation with pattern matching
+- **Loading States**: Prevents duplicate submissions
+- **Error Handling**: Displays user-friendly error messages
+
+## Component Structure
+
+```typescript
+@Component({
+  selector: 'app-auth-page',
+  templateUrl: './auth-page.component.html',
+  styleUrls: ['./auth-page.component.scss']
+})
+export class AuthPageComponent implements OnInit {
+  formType: 'login' | 'register' = 'login';
+  isAuthenticating = false;
+
+  constructor(
+    private route: ActivatedRoute,
+    private router: Router,
+    private authService: AuthService,
+    private userService: UserService,
+    private toastrService: ToastrService
+  ) { }
+
+  ngOnInit(): void {
+    this.route.data.subscribe(data => {
+      this.formType = data['formType'] || 'login';
+    });
+  }
+
+  handleFormSubmit(user: User): void {
+    if (this.formType === 'login') {
+      this.handleLogin(user);
+    } else {
+      this.handleRegister(user);
+    }
+  }
+}
+```
+
+## Sub-Component: Auth Form
+
+### Component Overview
+
+**Component**: `AuthFormComponent`  
+**Purpose**: Reusable reactive form supporting login and registration modes
+
+### Inputs
+
+<ParamField path="formType" type="'login' | 'register'" default="'login'">
+  Determines which form fields and behavior to display
+  - `'login'`: Email + Password only
+  - `'register'`: Name + Email + Password
+</ParamField>
+
+<ParamField path="disabled" type="boolean" default="false">
+  Disables form inputs and submit button when true (typically during API calls)
+</ParamField>
+
+### Outputs
+
+<ParamField path="formSubmit" type="EventEmitter<User>">
+  Emits validated user data when form is submitted. Only fires if form passes all validation rules.
+</ParamField>
+
+### Usage
+
+```html
+<app-auth-form
+  [formType]="formType"
+  [disabled]="isAuthenticating"
+  (formSubmit)="handleFormSubmit($event)">
+</app-auth-form>
+```
+
+## Auth Form Implementation
+
+```typescript
+@Component({
+  selector: 'app-auth-form',
+  templateUrl: './auth-form.component.html',
+  styleUrls: ['./auth-form.component.scss']
+})
+export class AuthFormComponent implements OnInit {
+  @Input() formType: 'login' | 'register' = 'login';
+  @Input() disabled = false;
+  @Output() formSubmit = new EventEmitter<User>();
+
+  title!: string;
+  submitButtonText!: string;
+  showNameField!: boolean;
+  showRegisterLink!: boolean;
+  showPasswordHint!: boolean;
+
+  form!: FormGroup;
+  hidePassword = true;
+  private passwordPattern = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
+
+  constructor(private fb: FormBuilder) { }
+
+  ngOnInit(): void {
+    this.configureByFormType();
+    this.buildForm();
+  }
+}
+```
+
+## Form Validation
+
+### Password Pattern
+
+The password must meet these requirements:
+- At least 6 characters
+- Contains at least one letter (a-zA-Z)
+- Contains at least one digit (0-9)
+- Contains at least one special character
+
+```typescript
+private passwordPattern = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[\W_]).{6,}$/;
+```
+
+### Form Validators
+
+```typescript
+private buildForm(): void {
+  const controls: Partial<Record<string, unknown>> = {
+    email: ['', [Validators.required, Validators.email]],
+    password: ['', [
+      Validators.required,
+      Validators.pattern(this.passwordPattern)
+    ]]
+  };
+
+  if (this.showNameField) {
+    controls['name'] = ['', Validators.required];
+  }
+
+  this.form = this.fb.group(controls);
+}
+```
+
+## Form Configuration by Type
+
+### Login Mode
+
+```typescript
+if (this.formType === 'login') {
+  this.title = 'Open the door';
+  this.submitButtonText = 'Login';
+  this.showNameField = false;
+  this.showRegisterLink = true;
+  this.showPasswordHint = false;
+}
+```
+
+### Register Mode
+
+```typescript
+if (this.formType === 'register') {
+  this.title = 'Join us!';
+  this.submitButtonText = 'Sign Up';
+  this.showNameField = true;
+  this.showRegisterLink = false;
+  this.showPasswordHint = true;
+}
+```
+
+## Authentication Methods
+
+### Login Handler
+
+```typescript
+private handleLogin(formData: User): void {
+  this.isAuthenticating = true;
+  this.userService.login(formData)
+    .pipe(
+      finalize(() => {
+        this.isAuthenticating = false;
+      })
+    )
+    .subscribe({
+      next: (data) => {
+        this.authService.setUserSession(data.user, data.token);
+        this.toastrService.success(`Welcome, ${data.user.name}`, `You are logged in`);
+        this.router.navigate(['']);
+      },
+      error: (error) => {
+        this.toastrService.error(error.message);
+      }
+    });
+}
+```
+
+### Registration Handler
+
+```typescript
+private handleRegister(formData: User): void {
+  this.isAuthenticating = true;
+  this.userService.register(formData)
+    .pipe(
+      finalize(() => {
+        this.isAuthenticating = false;
+      })
+    )
+    .subscribe({
+      next: (data) => {
+        this.toastrService.success(
+          `Welcome to ScreenPulse ${data.name}`, 
+          `Successful registration`
+        );
+        this.router.navigate(['login']);
+      },
+      error: (error) => {
+        this.toastrService.error(error.message);
+      }
+    });
+}
+```
+
+## Template Structure
+
+```html
+<div class="view">
+  <app-auth-form
+    [formType]="formType"
+    [disabled]="isAuthenticating"
+    (formSubmit)="handleFormSubmit($event)">
+  </app-auth-form>
+  <app-loading-spinner [visible]="isAuthenticating"></app-loading-spinner>
+</div>
+```
+
+## Form Methods
+
+### handleSubmit()
+
+Validates and emits form data.
+
+```typescript
+handleSubmit(): void {
+  if (this.form.valid) {
+    this.formSubmit.emit(this.form.value);
+  }
+}
+```
+
+### handleClear()
+
+Resets the form to initial state.
+
+```typescript
+handleClear(): void {
+  this.form.reset();
+}
+```
+
+## User Interface Model
+
+```typescript
+interface User {
+  name?: string;     // Required for registration only
+  email: string;     // Required for both
+  password: string;  // Required for both
+}
+```
+
+## Dependencies
+
+- **UserService**: Handles login/register API calls
+- **AuthService**: Manages user session and tokens
+- **ToastrService**: Displays success/error notifications
+- **Router**: Navigates after successful authentication
+- **ActivatedRoute**: Reads route data for form type
+- **ReactiveFormsModule**: Provides reactive form functionality

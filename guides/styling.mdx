@@ -1,0 +1,584 @@
+---
+title: 'Styling Guide'
+description: 'Master ScreenPulse styling with Angular Material theming, Bootstrap grid, and component-specific SCSS'
+icon: 'palette'
+---
+
+## Overview
+
+ScreenPulse combines Angular Material components, Bootstrap grid system, and custom SCSS for a cohesive dark-themed UI. This guide covers the styling architecture and best practices.
+
+## Global Styles
+
+### Theme Configuration
+
+The application uses a custom color scheme based on the Deep Purple & Amber Material theme:
+
+<CodeGroup>
+```scss styles.scss
+@use '@angular/material' as mat;
+@import '~@angular/material/prebuilt-themes/deeppurple-amber.css';
+
+html, body { 
+  height: 100%; 
+}
+
+body {
+  margin: 0;
+  font-family: Roboto, "Helvetica Neue", sans-serif;
+  background-color: black;
+}
+
+@import 'ngx-toastr/toastr';
+
+@font-face{
+  font-family: Glegoo;
+  src: url(./assets/fonts/Glegoo-Regular.ttf) format('truetype');
+}
+
+:root {
+  --custom-amber: #f5cf3d;
+  --custom-amber-disabled: #f5d03d4d;
+  --custom-error: red;
+}
+```
+</CodeGroup>
+
+<Note>
+  The application uses a custom "Glegoo" font for branding elements and defines CSS custom properties for consistent theming.
+</Note>
+
+### Custom CSS Variables
+
+<Accordion title="--custom-amber">
+  **Value**: `#f5cf3d`
+  
+  **Usage**: Primary accent color for buttons, links, and interactive elements
+  
+  ```scss
+  .screen{
+    color: var(--custom-amber);
+    font-weight: bold;
+  }
+  ```
+</Accordion>
+
+<Accordion title="--custom-amber-disabled">
+  **Value**: `#f5d03d4d` (semi-transparent)
+  
+  **Usage**: Disabled state for interactive elements
+  
+  ```scss
+  .mat-mdc-icon-button[disabled] .mat-mdc-paginator-icon {
+    fill: var(--custom-amber-disabled) !important;
+  }
+  ```
+</Accordion>
+
+<Accordion title="--custom-error">
+  **Value**: `red`
+  
+  **Usage**: Error states and validation messages
+  
+  ```scss
+  .mat-mdc-form-field.mat-accent.mat-form-field-invalid {
+    --mdc-outlined-text-field-outline-color: var(--custom-error);
+  }
+  ```
+</Accordion>
+
+## Angular Material Theming
+
+### Material Component Customization
+
+ScreenPulse extensively customizes Material components to match the dark theme:
+
+<Steps>
+  <Step title="Paginator Styling">
+    ```scss
+    .mat-mdc-paginator{
+      background-color: #00000000 !important;
+      border-radius: 20px;
+      border: 2px solid var(--custom-amber);
+    }
+
+    .mat-mdc-paginator-range-label {
+      color: var(--custom-amber);
+    }
+
+    .mat-mdc-paginator-icon{
+      fill: var(--custom-amber) !important;
+    }
+    ```
+  </Step>
+  
+  <Step title="Form Field Theming">
+    ```scss
+    .mat-mdc-form-field.mat-accent {
+      --mdc-outlined-text-field-outline-color: var(--custom-amber);
+      --mdc-outlined-text-field-focus-outline-color: var(--custom-amber);
+      --mdc-outlined-text-field-hover-outline-color: var(--custom-amber);
+    }
+
+    .mat-mdc-form-field {
+      color: var(--custom-amber);
+      padding: 10px;
+    }
+    ```
+  </Step>
+  
+  <Step title="Select Dropdown">
+    ```scss
+    ::ng-deep div.mat-mdc-select-panel {
+      background-color: rgb(0, 0, 0) !important;
+      border-left: 1px solid var(--custom-amber);
+      border-right: 1px solid var(--custom-amber);
+      border-bottom: 1px solid var(--custom-amber);
+    }
+
+    ::ng-deep .mat-mdc-option:hover {
+      background-color: var(--custom-amber) !important;
+      color: black !important;
+    }
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  Use `::ng-deep` (deprecated but functional) or global styles for deep component styling. Consider using ViewEncapsulation.None for component-specific global styles.
+</Tip>
+
+## Bootstrap Grid System
+
+### Responsive Layouts
+
+ScreenPulse uses ng-bootstrap for responsive grid layouts:
+
+```scss
+@media only screen and (max-width: 600px) {
+  .button-links-container{
+    display: none;
+  }
+  .login-container{
+    display: none;
+  }
+}
+
+@media only screen and (min-width: 601px){
+  .toogle-menu-button{
+    display: none;
+  }
+  .expanded-menu-container{
+    display: none;
+  }
+}
+```
+
+### Responsive Form Widths
+
+```scss search-bar.component.scss
+@media only screen and (max-width: 601px) {
+  form {
+    width: 100%;
+  }
+}
+
+@media only screen and (min-width: 602px) and (max-width: 992px) {
+  form {
+    width: 70%;
+  }
+}
+```
+
+## Component-Specific Styles
+
+### Navbar Component
+
+The navbar demonstrates flexbox layouts and responsive design:
+
+<CodeGroup>
+```scss navbar.component.scss
+mat-toolbar {
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  background: #000000;
+  color: rgb(255, 255, 255);
+  margin-left: auto;
+  margin-right: auto;
+  font-family: 'Glegoo';
+}
+
+.screen{
+  color: #F5CF3D;
+  font-weight: bold;
+}
+
+.spacer{
+  flex: 1 1 auto;
+}
+
+.navbar-container{
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+  width: 100%;
+  height: 100%;
+}
+```
+</CodeGroup>
+
+### Hover Effects with Transitions
+
+Create smooth hover effects using CSS transitions:
+
+```scss navbar.component.scss
+.button-links-container a{
+  text-decoration: none;
+  position: relative;
+  color:white;
+}
+
+.button-links-container a::before{
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 2px;
+  border-radius: 4px;
+  background-color: white;
+  bottom: -4px;
+  left: 0;
+  transform-origin: right;
+  transform: scaleX(0);
+  transition: transform .3s ease-in-out;
+}
+
+.button-links-container a:hover::before {
+  transform-origin: left;
+  transform: scaleX(1);
+}
+```
+
+<Note>
+  This creates an elegant underline animation that grows from left to right on hover.
+</Note>
+
+### Favorites Card Component
+
+Complex card layout with animations and responsive images:
+
+<CodeGroup>
+```scss favorites-card.component.scss
+.favorite-card {
+  flex: 1 1 160px;
+  max-width: 200px;
+  margin: 0; 
+  text-align: center;
+  border-radius: 10px;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.247);
+  background-color: #000000;
+}
+
+.img-container2 {
+  width: 115px;
+  height: 165px;
+  background-color: #0a0505;
+  border-radius: 10px 10px 0 0;
+  background-size: 100%;
+  background-position: center;
+  transition: background-size 1s ease, background-position 1s ease;
+  display: flex;
+  justify-content: space-between;
+}
+
+@media only screen and (min-width: 801px) {
+  .img-container2:hover {
+    background-size: 120%;
+    background-position: center;
+    cursor: pointer;
+  }
+}
+```
+</CodeGroup>
+
+### Type-Based Styling
+
+Different styles for movie types using classes:
+
+```scss favorites-card.component.scss
+.chip {
+  width: 100%;
+  border-radius: 30px;
+  font-style: italic;
+  font-weight: bold;
+  color: white;
+  text-align: center;
+  box-shadow: rgba(0, 0, 0, 0.4) 0px 2px 4px, 
+              rgba(0, 0, 0, 0.3) 0px 7px 13px -3px, 
+              rgba(0, 0, 0, 0.2) 0px -3px 0px inset;
+}
+
+.movie .chip {
+  background-color: rgb(255, 0, 0);
+}
+
+.series .chip {
+  background-color: rgb(255, 255, 0);
+}
+
+.game .chip {
+  background-color: rgb(0, 128, 0);
+}
+```
+
+## Animations
+
+### Keyframe Animations
+
+Create custom animations for interactive elements:
+
+```scss favorites-card.component.scss
+.edition {
+  position: absolute;
+  bottom: 34px;
+  width: 100%;
+  animation-name: edition;
+  animation-duration: 1.2s;
+  animation-fill-mode: forwards;
+  border-radius: 10px;
+}
+
+@keyframes edition {
+  0% {
+    bottom: 0%;
+    height: 100px;
+  }
+  100% {
+    bottom: 0%;
+    height: 160px;
+    visibility: visible;
+  }
+}
+```
+
+### Transition Effects
+
+Smooth transitions for hover states:
+
+```scss
+.img-container2 {
+  transition: background-size 1s ease, background-position 1s ease;
+}
+
+.img-container2:hover {
+  background-size: 120%;
+  cursor: pointer;
+}
+```
+
+## Box Shadows
+
+### Layered Shadow Effects
+
+ScreenPulse uses layered box-shadows for depth:
+
+```scss
+box-shadow: 
+  rgba(0, 0, 0, 0.4) 0px 2px 4px,           // Main shadow
+  rgba(0, 0, 0, 0.3) 0px 7px 13px -3px,     // Softer extended shadow
+  rgba(0, 0, 0, 0.2) 0px -3px 0px inset;    // Inner shadow for depth
+```
+
+<Tip>
+  Layer multiple shadows with different blur radii and offsets to create realistic depth and elevation effects.
+</Tip>
+
+## Form Styling
+
+### Custom Form Fields
+
+Styled form with Material components:
+
+```scss search-bar.component.scss
+form {
+  background-color: #000000;
+  width: 100%;
+  padding-top: 20px;
+  margin-left: auto;
+  margin-right: auto;
+  border-radius: 10px;
+  box-shadow: -10px 0px 13px -7px #000000, 
+              10px 0px 13px -7px #000000, 
+              inset 5px 5px 8px 12px rgba(0, 0, 0, 0);
+  display: flex;        
+  flex-direction: column;
+}
+
+mat-label {
+  color: var(--custom-amber) !important;
+}
+
+.mdc-text-field__input {
+  color: var(--custom-amber) !important;
+}
+```
+
+### Disabled Button States
+
+```scss
+.button-container button[disabled] {
+  opacity: 1;
+  background-color: #683ab76e;
+}
+
+.button-icon-disabled{
+  color:#202020 !important;
+}
+
+.button-icon-enabled{
+  color:#ffffff !important;
+}
+```
+
+## Loading Spinner
+
+Minimalist loading indicator styling:
+
+```scss loading-spinner.component.scss
+.loading-container{
+  text-align: center;
+  color: #f5cf3d;
+}
+
+.loading-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+```
+
+## Best Practices
+
+### 1. Use CSS Custom Properties
+
+```scss
+// ✅ Good - Reusable and themable
+.button {
+  color: var(--custom-amber);
+}
+
+// ❌ Bad - Hardcoded colors
+.button {
+  color: #f5cf3d;
+}
+```
+
+### 2. Mobile-First Responsive Design
+
+```scss
+// ✅ Good - Mobile first
+.container {
+  width: 100%;
+}
+
+@media only screen and (min-width: 601px) {
+  .container {
+    width: 70%;
+  }
+}
+
+// ❌ Bad - Desktop first
+.container {
+  width: 70%;
+}
+
+@media only screen and (max-width: 600px) {
+  .container {
+    width: 100%;
+  }
+}
+```
+
+### 3. Component-Scoped Styles
+
+```scss
+// Component-specific file: favorites-card.component.scss
+.favorite-card {
+  // Styles scoped to this component
+}
+```
+
+### 4. Consistent Spacing
+
+```scss
+button {
+  margin: 10px;
+  padding: 10px;
+}
+
+mat-toolbar {
+  height: 80px;
+}
+```
+
+### 5. Accessible Color Contrast
+
+Ensure text is readable against backgrounds:
+
+```scss
+.chip {
+  color: white;
+  text-shadow:
+    1px 1px 0.5px #000,
+    -1px 1px 0.5px #000,
+    -1px -1px 0 #000,
+    1px -1px 0 #000;
+}
+```
+
+## Carousel Component Example
+
+```scss carousel.component.scss
+:host {
+  --carousel-btn-size: 50px;
+  --carousel-btn-bg: rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+  background: #ffff0000;
+  height: 80%;
+  margin-left: 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+
+img {
+  width: 70%;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: rgba(0, 0, 0, 0.4) 0px 2px 4px, 
+              rgba(0, 0, 0, 0.3) 0px 7px 13px -3px, 
+              rgba(0, 0, 0, 0.2) 0px -3px 0px inset;
+  cursor: pointer;
+}
+
+@media only screen and (min-width: 1367px) {
+  :host {
+    height: 100%;
+  }
+}
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Angular Material" icon="material-ui" href="https://material.angular.io/">
+    Official Angular Material documentation
+  </Card>
+  <Card title="Bootstrap Grid" icon="grid" href="https://getbootstrap.com/docs/5.2/layout/grid/">
+    Bootstrap responsive grid system
+  </Card>
+</CardGroup>

@@ -1,0 +1,527 @@
+---
+title: 'ErrorInterceptor'
+description: 'HTTP interceptor for centralized error handling and user-friendly error messages'
+icon: 'triangle-exclamation'
+---
+
+## Overview
+
+The `ErrorInterceptor` is an Angular HTTP interceptor that catches HTTP errors and transforms them into user-friendly error messages. It provides centralized error handling for common HTTP status codes including network errors, authentication issues, conflicts, and not found errors.
+
+## Import
+
+```typescript
+import { ErrorInterceptor } from 'src/app/core/interceptors/error.interceptor';
+import { HTTP_INTERCEPTORS } from '@angular/common/http';
+```
+
+## Implementation
+
+```typescript
+import { Injectable } from '@angular/core';
+import {
+  HttpEvent,
+  HttpInterceptor,
+  HttpHandler,
+  HttpRequest,
+  HttpErrorResponse
+} from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+
+@Injectable()
+export class ErrorInterceptor implements HttpInterceptor {
+  intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    return next.handle(req).pipe(
+      catchError((error: HttpErrorResponse) => {
+        let message = 'An unknown error occurred.';
+        switch (error.status) {
+          case 0:
+            message = 'Cannot connect to server. Please check your internet connection';
+            break;
+          case 401:
+            message = 'Unauthorized access. Please try it again';
+            if (error.error.code === 'AUTH_TOKEN_EXPIRED') {
+              message = 'Session expired. Please login again';
+            }
+            break;
+          case 404:
+            message = 'The favorite you are trying to delete could not be found in your list. Please try again later.';
+            break;
+          case 409:
+            if (error.error.code === 'USER_EXISTS') {
+              message = 'User with this email already exists';
+            }
+            if (error.error.code === 'FAVORITE_EXISTS') {
+              message = 'Media item already in favorites';
+            }
+            break;
+          default:
+            message = 'An unexpected error occurred. Please try again later';
+            break;
+        }
+
+        return throwError(() => ({
+          message,
+          status: error.status,
+        }));
+      })
+    );
+  }
+}
+```
+
+## Method
+
+### intercept
+
+Intercepts HTTP responses to catch errors and provide user-friendly messages.
+
+```typescript
+intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>>
+```
+
+<ParamField path="req" type="HttpRequest<unknown>" required>
+  The outgoing HTTP request
+</ParamField>
+
+<ParamField path="next" type="HttpHandler" required>
+  The next interceptor in the chain or the backend
+</ParamField>
+
+<ResponseField name="return" type="Observable<HttpEvent<unknown>>">
+  Observable of HTTP events or transformed errors
+</ResponseField>
+
+## Error Status Codes
+
+### 0 - Network Error
+
+**Trigger:** Cannot connect to server (network offline, server down, CORS issues)
+
+**Message:** `"Cannot connect to server. Please check your internet connection"`
+
+```typescript
+case 0:
+  message = 'Cannot connect to server. Please check your internet connection';
+  break;
+```
+
+**Example:**
+
+```typescript
+userService.login(credentials).subscribe({
+  error: (error) => {
+    if (error.status === 0) {
+      console.log(error.message);
+      // "Cannot connect to server. Please check your internet connection"
+    }
+  }
+});
+```
+
+---
+
+### 401 - Unauthorized
+
+**Trigger:** Authentication required or token invalid/expired
+
+**Default Message:** `"Unauthorized access. Please try it again"`
+
+**Session Expired:** `"Session expired. Please login again"` (when `error.error.code === 'AUTH_TOKEN_EXPIRED'`)
+
+```typescript
+case 401:
+  message = 'Unauthorized access. Please try it again';
+  if (error.error.code === 'AUTH_TOKEN_EXPIRED') {
+    message = 'Session expired. Please login again';
+  }
+  break;
+```
+
+**Example:**
+
+```typescript
+favoritesService.getFavorites(1, 10).subscribe({
+  error: (error) => {
+    if (error.status === 401) {
+      console.log(error.message);
+      // "Session expired. Please login again"
+      // Or "Unauthorized access. Please try it again"
+    }
+  }
+});
+```
+
+---
+
+### 404 - Not Found
+
+**Trigger:** Resource not found (typically when deleting a favorite that doesn't exist)
+
+**Message:** `"The favorite you are trying to delete could not be found in your list. Please try again later."`
+
+```typescript
+case 404:
+  message = 'The favorite you are trying to delete could not be found in your list. Please try again later.';
+  break;
+```
+
+**Example:**
+
+```typescript
+favoritesService.deleteMediaItem('invalid-id').subscribe({
+  error: (error) => {
+    if (error.status === 404) {
+      console.log(error.message);
+      // "The favorite you are trying to delete could not be found..."
+    }
+  }
+});
+```
+
+---
+
+### 409 - Conflict
+
+**Trigger:** Resource conflict (user already exists, favorite already added)
+
+**USER_EXISTS:** `"User with this email already exists"`
+
+**FAVORITE_EXISTS:** `"Media item already in favorites"`
+
+```typescript
+case 409:
+  if (error.error.code === 'USER_EXISTS') {
+    message = 'User with this email already exists';
+  }
+  if (error.error.code === 'FAVORITE_EXISTS') {
+    message = 'Media item already in favorites';
+  }
+  break;
+```
+
+**Example:**
+
+```typescript
+// Registration conflict
+userService.register(newUser).subscribe({
+  error: (error) => {
+    if (error.status === 409) {
+      console.log(error.message);
+      // "User with this email already exists"
+    }
+  }
+});
+
+// Favorite conflict
+favoritesService.addToFavorites(mediaItem).subscribe({
+  error: (error) => {
+    if (error.status === 409) {
+      console.log(error.message);
+      // "Media item already in favorites"
+    }
+  }
+});
+```
+
+---
+
+### Default - Other Errors
+
+**Trigger:** Any other HTTP error (500, 503, etc.)
+
+**Message:** `"An unexpected error occurred. Please try again later"`
+
+```typescript
+default:
+  message = 'An unexpected error occurred. Please try again later';
+  break;
+```
+
+## Registration
+
+### app.module.ts
+
+```typescript
+import { NgModule } from '@angular/core';
+import { HTTP_INTERCEPTORS, HttpClientModule } from '@angular/common/http';
+import { ErrorInterceptor } from './core/interceptors/error.interceptor';
+import { AuthInterceptor } from './core/interceptors/auth.interceptor';
+
+@NgModule({
+  imports: [
+    HttpClientModule,
+    // other imports
+  ],
+  providers: [
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: AuthInterceptor,
+      multi: true
+    },
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: ErrorInterceptor,
+      multi: true
+    }
+  ]
+})
+export class AppModule {}
+```
+
+<Warning>
+  **Interceptor Order Matters**: Register AuthInterceptor before ErrorInterceptor so that authentication errors are processed before general error handling.
+</Warning>
+
+## Error Response Format
+
+The interceptor transforms errors into a consistent format:
+
+```typescript
+interface TransformedError {
+  message: string;  // User-friendly error message
+  status: number;   // Original HTTP status code
+}
+```
+
+## Usage Examples
+
+### Displaying Errors to Users
+
+```typescript
+import { Component } from '@angular/core';
+import { UserService } from 'src/app/core/services/user.service';
+import { ToastrService } from 'ngx-toastr';
+
+@Component({
+  selector: 'app-login',
+  templateUrl: './login.component.html'
+})
+export class LoginComponent {
+  constructor(
+    private userService: UserService,
+    private toastr: ToastrService
+  ) {}
+
+  login(email: string, password: string) {
+    this.userService.login({ email, password, name: '' }).subscribe({
+      next: (response) => {
+        this.toastr.success('Login successful!');
+      },
+      error: (error) => {
+        // Error is already transformed by ErrorInterceptor
+        this.toastr.error(error.message, 'Login Failed');
+        // Possible messages:
+        // - "Cannot connect to server. Please check your internet connection"
+        // - "Unauthorized access. Please try it again"
+        // - "Session expired. Please login again"
+      }
+    });
+  }
+}
+```
+
+### Handling Specific Errors
+
+```typescript
+import { Component } from '@angular/core';
+import { FavoritesService } from 'src/app/shared/services/favorites/favorites.service';
+import { MediaItem } from 'src/app/shared/models/movie.model';
+
+@Component({
+  selector: 'app-add-favorite',
+  templateUrl: './add-favorite.component.html'
+})
+export class AddFavoriteComponent {
+  constructor(private favoritesService: FavoritesService) {}
+
+  addFavorite(mediaItem: MediaItem) {
+    this.favoritesService.addToFavorites(mediaItem).subscribe({
+      next: (created) => {
+        console.log('Added to favorites:', created);
+      },
+      error: (error) => {
+        // Handle specific error cases
+        if (error.status === 409) {
+          // "Media item already in favorites"
+          console.log('Already in favorites, navigating to favorites page...');
+        } else if (error.status === 401) {
+          // "Session expired. Please login again"
+          console.log('Please login to add favorites');
+        } else if (error.status === 0) {
+          // "Cannot connect to server..."
+          console.log('Network error, will retry later');
+        } else {
+          // "An unexpected error occurred..."
+          console.error('Unexpected error:', error.message);
+        }
+      }
+    });
+  }
+}
+```
+
+### Global Error Handler
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { NavigationError, Router } from '@angular/router';
+import { ToastrService } from 'ngx-toastr';
+
+@Component({
+  selector: 'app-root',
+  templateUrl: './app.component.html'
+})
+export class AppComponent implements OnInit {
+  constructor(
+    private router: Router,
+    private toastr: ToastrService
+  ) {}
+
+  ngOnInit() {
+    // Global error handling for navigation errors
+    this.router.events.subscribe(event => {
+      if (event instanceof NavigationError) {
+        this.toastr.error('Navigation failed', 'Error');
+      }
+    });
+  }
+}
+```
+
+## Backend Error Response Format
+
+For proper error code detection, the backend should return errors in this format:
+
+```json
+{
+  "code": "AUTH_TOKEN_EXPIRED",
+  "message": "Your session has expired"
+}
+```
+
+**Supported Error Codes:**
+- `AUTH_TOKEN_EXPIRED` - Token has expired (401)
+- `USER_EXISTS` - Email already registered (409)
+- `FAVORITE_EXISTS` - Media item already in favorites (409)
+
+## Testing
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { HTTP_INTERCEPTORS, HttpClient } from '@angular/common/http';
+import { ErrorInterceptor } from './error.interceptor';
+
+describe('ErrorInterceptor', () => {
+  let httpMock: HttpTestingController;
+  let httpClient: HttpClient;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [
+        { provide: HTTP_INTERCEPTORS, useClass: ErrorInterceptor, multi: true }
+      ]
+    });
+
+    httpMock = TestBed.inject(HttpTestingController);
+    httpClient = TestBed.inject(HttpClient);
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('should transform 401 error with AUTH_TOKEN_EXPIRED code', (done) => {
+    httpClient.get('/api/test').subscribe(
+      () => fail('should have failed'),
+      (error) => {
+        expect(error.status).toBe(401);
+        expect(error.message).toBe('Session expired. Please login again');
+        done();
+      }
+    );
+
+    const req = httpMock.expectOne('/api/test');
+    req.flush(
+      { code: 'AUTH_TOKEN_EXPIRED' },
+      { status: 401, statusText: 'Unauthorized' }
+    );
+  });
+
+  it('should transform 409 error with USER_EXISTS code', (done) => {
+    httpClient.post('/api/register', {}).subscribe(
+      () => fail('should have failed'),
+      (error) => {
+        expect(error.status).toBe(409);
+        expect(error.message).toBe('User with this email already exists');
+        done();
+      }
+    );
+
+    const req = httpMock.expectOne('/api/register');
+    req.flush(
+      { code: 'USER_EXISTS' },
+      { status: 409, statusText: 'Conflict' }
+    );
+  });
+
+  it('should transform 0 status to network error message', (done) => {
+    httpClient.get('/api/test').subscribe(
+      () => fail('should have failed'),
+      (error) => {
+        expect(error.status).toBe(0);
+        expect(error.message).toBe('Cannot connect to server. Please check your internet connection');
+        done();
+      }
+    );
+
+    const req = httpMock.expectOne('/api/test');
+    req.error(new ProgressEvent('error'));
+  });
+});
+```
+
+## Integration with Toast Notifications
+
+Combine ErrorInterceptor with a toast service for automatic user notifications:
+
+```typescript
+import { Injectable } from '@angular/core';
+import { HttpInterceptor, HttpRequest, HttpHandler, HttpEvent, HttpErrorResponse } from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { ToastrService } from 'ngx-toastr';
+
+@Injectable()
+export class ErrorInterceptor implements HttpInterceptor {
+  constructor(private toastr: ToastrService) {}
+
+  intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    return next.handle(req).pipe(
+      catchError((error: HttpErrorResponse) => {
+        let message = this.getErrorMessage(error);
+        
+        // Automatically show toast for all errors
+        this.toastr.error(message, 'Error');
+        
+        return throwError(() => ({ message, status: error.status }));
+      })
+    );
+  }
+
+  private getErrorMessage(error: HttpErrorResponse): string {
+    // Same logic as before
+    // ...
+  }
+}
+```
+
+## Related
+
+- [AuthInterceptor](/api/interceptors/auth-interceptor) - Handles authentication token injection
+- [UserService](/api/services/user-service) - Uses error handling for login/register
+- [FavoritesService](/api/services/favorites-service) - Uses error handling for CRUD operations
+- [AuthGuard](/api/guards/auth-guard) - Works with authentication errors

@@ -1,0 +1,627 @@
+---
+title: 'Testing Guide'
+description: 'Learn how to test ScreenPulse components and services with Jasmine and Karma'
+icon: 'vial'
+---
+
+## Overview
+
+ScreenPulse uses **Jasmine** as the testing framework and **Karma** as the test runner. This guide covers testing patterns, configuration, and best practices for both components and services.
+
+## Testing Stack
+
+<CardGroup cols={3}>
+  <Card title="Jasmine" icon="flask">
+    Behavior-driven testing framework
+  </Card>
+  <Card title="Karma" icon="play">
+    Test runner for Angular
+  </Card>
+  <Card title="Angular Testing Utilities" icon="angular">
+    TestBed, fixtures, and mocks
+  </Card>
+</CardGroup>
+
+## Running Tests
+
+### NPM Scripts
+
+From `package.json`, tests can be run with:
+
+```bash
+npm test
+```
+
+This executes the Angular test command:
+
+```json package.json
+{
+  "scripts": {
+    "test": "ng test",
+    "watch": "ng build --watch --configuration development"
+  }
+}
+```
+
+<Tip>
+  Use `npm test` to run tests in watch mode, which automatically re-runs tests when files change.
+</Tip>
+
+## Test File Structure
+
+### Naming Convention
+
+All test files follow the `.spec.ts` naming pattern:
+
+```
+src/app/
+├── core/
+│   ├── services/
+│   │   ├── auth.service.ts
+│   │   └── auth.service.spec.ts
+│   └── guards/
+│       ├── auth.guard.ts
+│       └── auth.guard.spec.ts
+├── shared/
+│   ├── components/
+│   │   └── loading-spinner/
+│   │       ├── loading-spinner.component.ts
+│   │       └── loading-spinner.component.spec.ts
+│   └── services/
+│       └── favorites/
+│           ├── favorites.service.ts
+│           └── favorites.service.spec.ts
+└── pages/
+    └── auth/
+        └── components/
+            └── auth-form/
+                ├── auth-form.component.ts
+                └── auth-form.component.spec.ts
+```
+
+## Service Testing
+
+### Basic Service Test
+
+Here's the basic structure for testing an Angular service:
+
+<CodeGroup>
+```typescript auth.service.spec.ts
+import { TestBed } from '@angular/core/testing';
+import { AuthService } from './auth.service';
+
+describe('AuthService', () => {
+  let service: AuthService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(AuthService);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+});
+```
+</CodeGroup>
+
+<Steps>
+  <Step title="Import TestBed">
+    ```typescript
+    import { TestBed } from '@angular/core/testing';
+    ```
+    TestBed is the primary Angular testing utility for configuring and creating an Angular testing module.
+  </Step>
+  
+  <Step title="Configure TestBed">
+    ```typescript
+    beforeEach(() => {
+      TestBed.configureTestingModule({});
+      service = TestBed.inject(AuthService);
+    });
+    ```
+    Set up the testing module and inject the service before each test.
+  </Step>
+  
+  <Step title="Write test specs">
+    ```typescript
+    it('should be created', () => {
+      expect(service).toBeTruthy();
+    });
+    ```
+    Use Jasmine's `it()` and `expect()` to write test assertions.
+  </Step>
+</Steps>
+
+### Testing HTTP Services
+
+Services that make HTTP calls require `HttpClientModule` or `HttpClientTestingModule`:
+
+<CodeGroup>
+```typescript favorites.service.spec.ts
+import { TestBed } from '@angular/core/testing';
+import { FavoritesService } from './favorites.service';
+import { HttpClientModule } from '@angular/common/http';
+
+describe('FavoritesService', () => {
+  let service: FavoritesService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports:[HttpClientModule]
+    });
+    service = TestBed.inject(FavoritesService);
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+});
+```
+</CodeGroup>
+
+<Note>
+  The `HttpClientModule` is imported in the TestBed configuration to provide HTTP dependencies for the service.
+</Note>
+
+### Advanced HTTP Testing with HttpClientTestingModule
+
+For more controlled testing, use `HttpClientTestingModule`:
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { FavoritesService } from './favorites.service';
+import { MediaItem } from '../../models/movie.model';
+
+describe('FavoritesService', () => {
+  let service: FavoritesService;
+  let httpMock: HttpTestingController;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [FavoritesService]
+    });
+    service = TestBed.inject(FavoritesService);
+    httpMock = TestBed.inject(HttpTestingController);
+  });
+
+  afterEach(() => {
+    httpMock.verify(); // Ensure no outstanding requests
+  });
+
+  it('should fetch favorites', () => {
+    const mockResponse = {
+      favorites: [],
+      total: 0,
+      page: 1
+    };
+
+    service.getFavorites(1, 10).subscribe((response) => {
+      expect(response).toEqual(mockResponse);
+    });
+
+    const req = httpMock.expectOne((request) => 
+      request.url.includes('favorites')
+    );
+    expect(req.request.method).toBe('GET');
+    req.flush(mockResponse);
+  });
+
+  it('should delete a favorite', () => {
+    const mediaId = '123';
+    const mockResponse = { message: 'Deleted successfully' };
+
+    service.deleteMediaItem(mediaId).subscribe((response) => {
+      expect(response.message).toBe('Deleted successfully');
+    });
+
+    const req = httpMock.expectOne((request) => 
+      request.url.includes(`favorites/${mediaId}`)
+    );
+    expect(req.request.method).toBe('DELETE');
+    req.flush(mockResponse);
+  });
+});
+```
+
+## Component Testing
+
+### Basic Component Test
+
+Component tests require additional setup for templates and dependencies:
+
+<CodeGroup>
+```typescript auth-form.component.spec.ts
+import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { AuthFormComponent } from './auth-form.component';
+import { HttpClientModule } from '@angular/common/http';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { ReactiveFormsModule } from '@angular/forms';
+import { MatInputModule } from '@angular/material/input';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+
+describe('AuthFormComponent', () => {
+  let component: AuthFormComponent;
+  let fixture: ComponentFixture<AuthFormComponent>;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      imports: [
+        HttpClientModule, 
+        MatFormFieldModule,
+        MatIconModule,
+        ReactiveFormsModule,
+        MatInputModule,
+        BrowserAnimationsModule
+      ],
+      declarations: [AuthFormComponent]
+    });
+    fixture = TestBed.createComponent(AuthFormComponent);
+    component = fixture.componentInstance;
+    fixture.detectChanges();
+  });
+
+  it('should create', () => {
+    expect(component).toBeTruthy();
+  });
+});
+```
+</CodeGroup>
+
+### Component Testing Anatomy
+
+<Accordion title="ComponentFixture">
+  **Purpose**: Wrapper around component instance for testing
+  
+  **Usage**:
+  ```typescript
+  fixture = TestBed.createComponent(AuthFormComponent);
+  component = fixture.componentInstance;
+  ```
+  
+  **Methods**:
+  - `detectChanges()`: Trigger change detection
+  - `debugElement`: Access DOM elements
+  - `nativeElement`: Access native DOM
+</Accordion>
+
+<Accordion title="TestBed.configureTestingModule">
+  **Purpose**: Configure testing module with dependencies
+  
+  **Properties**:
+  - `imports`: Import required modules (FormsModule, Material, etc.)
+  - `declarations`: Declare components to test
+  - `providers`: Provide services and mocks
+  
+  ```typescript
+  TestBed.configureTestingModule({
+    imports: [HttpClientModule, ReactiveFormsModule],
+    declarations: [AuthFormComponent],
+    providers: [AuthService]
+  });
+  ```
+</Accordion>
+
+<Accordion title="fixture.detectChanges()">
+  **Purpose**: Trigger Angular change detection
+  
+  **When to use**:
+  - After component creation
+  - After changing component properties
+  - Before querying DOM elements
+  
+  ```typescript
+  component.username = 'test';
+  fixture.detectChanges(); // Update view
+  ```
+</Accordion>
+
+### Testing Component with Material Dependencies
+
+Components using Angular Material require specific module imports:
+
+```typescript
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
+import { ReactiveFormsModule } from '@angular/forms';
+
+beforeEach(() => {
+  TestBed.configureTestingModule({
+    imports: [
+      BrowserAnimationsModule,  // Required for Material animations
+      MatFormFieldModule,       // Material form fields
+      MatInputModule,           // Material inputs
+      MatIconModule,            // Material icons
+      ReactiveFormsModule       // Reactive forms
+    ],
+    declarations: [AuthFormComponent]
+  });
+});
+```
+
+<Tip>
+  Always import `BrowserAnimationsModule` when testing components with Angular Material to prevent animation-related errors.
+</Tip>
+
+## Testing AuthService
+
+Here's a complete example testing the AuthService with session storage:
+
+```typescript auth.service.spec.ts
+import { TestBed } from '@angular/core/testing';
+import { AuthService } from './auth.service';
+import { AuthUser } from 'src/app/shared/models/auth.model';
+
+describe('AuthService', () => {
+  let service: AuthService;
+
+  beforeEach(() => {
+    TestBed.configureTestingModule({});
+    service = TestBed.inject(AuthService);
+    sessionStorage.clear(); // Clear before each test
+  });
+
+  it('should be created', () => {
+    expect(service).toBeTruthy();
+  });
+
+  it('should set auth token', () => {
+    service.setAuthToken('test-token');
+    expect(service.getAuthToken()).toBe('test-token');
+    expect(sessionStorage.getItem('authToken')).toBe('test-token');
+  });
+
+  it('should set user session', () => {
+    const user: AuthUser = {
+      email: 'test@example.com',
+      name: 'Test User'
+    };
+    service.setUserSession(user, 'token123');
+    
+    expect(service.getUserMail()).toBe('test@example.com');
+    expect(service.getUserName()).toBe('Test User');
+    expect(service.getAuthToken()).toBe('token123');
+  });
+
+  it('should observe login state', (done) => {
+    service.isLoggedInObservable().subscribe((isLoggedIn) => {
+      if (isLoggedIn) {
+        expect(isLoggedIn).toBe(true);
+        done();
+      }
+    });
+    
+    service.setAuthToken('test-token');
+  });
+
+  it('should clear session on logout', () => {
+    service.setAuthToken('test-token');
+    service.setUserMail('test@example.com');
+    
+    service.logOut();
+    
+    expect(service.getAuthToken()).toBeNull();
+    expect(service.getUserMail()).toBeNull();
+  });
+});
+```
+
+## Test Patterns
+
+### AAA Pattern (Arrange, Act, Assert)
+
+```typescript
+it('should add item to favorites', () => {
+  // Arrange
+  const mockItem: MediaItem = {
+    title: 'Test Movie',
+    imdbID: '123'
+  };
+  
+  // Act
+  service.addToFavorites(mockItem).subscribe((response) => {
+    // Assert
+    expect(response.title).toBe('Test Movie');
+  });
+  
+  const req = httpMock.expectOne((request) => 
+    request.url.includes('favorites')
+  );
+  req.flush(mockItem);
+});
+```
+
+### Testing Observables
+
+```typescript
+it('should emit user email changes', (done) => {
+  service.getUserMailObservable().subscribe((email) => {
+    expect(email).toBe('new@example.com');
+    done(); // Signal async test completion
+  });
+  
+  service.setUserMail('new@example.com');
+});
+```
+
+### Spying on Methods
+
+```typescript
+it('should call authService.getAuthToken', () => {
+  const authService = TestBed.inject(AuthService);
+  spyOn(authService, 'getAuthToken').and.returnValue('mock-token');
+  
+  service.getFavorites(1, 10);
+  
+  expect(authService.getAuthToken).toHaveBeenCalled();
+});
+```
+
+## Best Practices
+
+### 1. Isolate Tests
+
+```typescript
+beforeEach(() => {
+  sessionStorage.clear();
+  localStorage.clear();
+});
+
+afterEach(() => {
+  httpMock.verify(); // No outstanding HTTP requests
+});
+```
+
+### 2. Test One Thing Per Spec
+
+```typescript
+// ✅ Good - Single responsibility
+it('should set auth token', () => {
+  service.setAuthToken('token');
+  expect(service.getAuthToken()).toBe('token');
+});
+
+it('should update login state when token is set', () => {
+  service.setAuthToken('token');
+  service.isLoggedInObservable().subscribe((state) => {
+    expect(state).toBe(true);
+  });
+});
+
+// ❌ Bad - Testing multiple things
+it('should handle authentication', () => {
+  service.setAuthToken('token');
+  expect(service.getAuthToken()).toBe('token');
+  service.logOut();
+  expect(service.getAuthToken()).toBeNull();
+});
+```
+
+### 3. Use Descriptive Test Names
+
+```typescript
+// ✅ Good
+it('should return null when user is not logged in', () => {});
+it('should emit error when token is expired', () => {});
+
+// ❌ Bad
+it('should work', () => {});
+it('test 1', () => {});
+```
+
+### 4. Mock External Dependencies
+
+```typescript
+const mockAuthService = {
+  getAuthToken: () => 'mock-token',
+  isLoggedInObservable: () => of(true)
+};
+
+TestBed.configureTestingModule({
+  providers: [
+    { provide: AuthService, useValue: mockAuthService }
+  ]
+});
+```
+
+### 5. Test Error Cases
+
+```typescript
+it('should handle HTTP error', () => {
+  service.getFavorites(1, 10).subscribe({
+    next: () => fail('Should have failed'),
+    error: (error) => {
+      expect(error.status).toBe(401);
+      expect(error.message).toContain('Unauthorized');
+    }
+  });
+  
+  const req = httpMock.expectOne((request) => 
+    request.url.includes('favorites')
+  );
+  req.flush('Unauthorized', { status: 401, statusText: 'Unauthorized' });
+});
+```
+
+## Common Testing Scenarios
+
+### Testing Forms
+
+```typescript
+it('should validate email format', () => {
+  const emailControl = component.loginForm.get('email');
+  
+  emailControl?.setValue('invalid-email');
+  expect(emailControl?.hasError('email')).toBe(true);
+  
+  emailControl?.setValue('valid@email.com');
+  expect(emailControl?.hasError('email')).toBe(false);
+});
+```
+
+### Testing Event Emitters
+
+```typescript
+it('should emit favoriteDeleted event', (done) => {
+  service.favoriteDeleted.subscribe((id: string) => {
+    expect(id).toBe('123');
+    done();
+  });
+  
+  service.favoriteDeleted.emit('123');
+});
+```
+
+### Testing DOM Interaction
+
+```typescript
+it('should display loading spinner', () => {
+  component.isLoading = true;
+  fixture.detectChanges();
+  
+  const spinner = fixture.debugElement.query(By.css('.loading-spinner'));
+  expect(spinner).toBeTruthy();
+});
+```
+
+## Testing Dependencies
+
+From `package.json`:
+
+```json
+"devDependencies": {
+  "@types/jasmine": "~4.3.0",
+  "jasmine-core": "~4.6.0",
+  "karma": "~6.4.0",
+  "karma-chrome-launcher": "~3.2.0",
+  "karma-coverage": "~2.2.0",
+  "karma-jasmine": "~5.1.0",
+  "karma-jasmine-html-reporter": "~2.1.0"
+}
+```
+
+<Note>
+  ScreenPulse uses Karma 6.4.0 with Jasmine 4.6.0 and Chrome launcher for running tests in a real browser environment.
+</Note>
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Jasmine Documentation" icon="book" href="https://jasmine.github.io/">
+    Official Jasmine testing framework docs
+  </Card>
+  <Card title="Angular Testing Guide" icon="angular" href="https://angular.io/guide/testing">
+    Comprehensive Angular testing guide
+  </Card>
+  <Card title="Error Handling" icon="triangle-exclamation" href="/guides/error-handling">
+    Testing error interceptors and handlers
+  </Card>
+  <Card title="Authentication" icon="shield-halved" href="/guides/authentication">
+    Testing auth services and guards
+  </Card>
+</CardGroup>

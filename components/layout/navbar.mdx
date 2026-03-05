@@ -1,0 +1,158 @@
+---
+title: 'Navbar'
+description: 'Global navigation bar with authentication state management'
+icon: 'bars'
+---
+
+## Overview
+
+The Navbar component provides the primary navigation structure for ScreenPulse, featuring responsive design, authentication state management, and dynamic menu toggling.
+
+**Location**: `src/app/layout/navbar/navbar.component.ts`
+
+## Key Features
+
+- **Authentication Integration**: Displays different UI based on login status
+- **Responsive Design**: Mobile menu with hamburger toggle
+- **OnPush Change Detection**: Optimized performance
+- **Reactive State Management**: Uses RxJS observables for user data
+
+## Component Structure
+
+<Tabs>
+  <Tab title="TypeScript">
+    ```typescript
+    @Component({
+      selector: 'app-navbar',
+      templateUrl: './navbar.component.html',
+      styleUrls: ['./navbar.component.scss'],
+      changeDetection: ChangeDetectionStrategy.OnPush
+    })
+    export class NavbarComponent {
+      expanded = false;
+      readonly userData$ : Observable<UserSessionData> = combineLatest({
+        email: this.authService.getUserMailObservable(),
+        isLoggedIn: this.authService.isLoggedInObservable() 
+      });
+
+      constructor(
+        private authService: AuthService,
+        private router: Router
+      ) { }
+
+      logOut() {
+        this.authService.logOut();
+        this.router.navigate(['']);
+      }
+
+      toggleMenu() {
+        this.expanded = !this.expanded;
+      }
+    }
+    ```
+  </Tab>
+  <Tab title="Template">
+    ```html
+    <mat-toolbar color="primary">
+      <div class="navbar-container">
+        <span class="screen">ScreenPulse</span>
+        <mat-icon aria-hidden="true" class="icon">tv</mat-icon>
+        <span class="spacer"></span>
+
+        <ng-container *ngIf="userData$ | async as data">
+          <ng-container *ngIf="!data.isLoggedIn; else loggedInBlock">
+            <a routerLink="/auth/register" mat-icon-button>
+              <mat-icon fontIcon="person_add_alt"></mat-icon>
+              <span class="join">Join us!</span>
+            </a>
+            <a routerLink="/auth/login" mat-icon-button>
+              <mat-icon fontIcon="login"></mat-icon>
+            </a>
+          </ng-container>
+
+          <ng-template #loggedInBlock>
+            <span class="logged">
+              Welcome <span class="user-mail">{{ data.email }}</span>
+            </span>
+            <button mat-icon-button (click)="logOut()">
+              <mat-icon fontIcon="logout"></mat-icon>
+            </button>
+          </ng-template>
+
+          <div class="button-links-container">
+            <a routerLink="" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}">Search</a>
+            <a routerLink="/favorites" routerLinkActive="active">Favorites</a>
+          </div>
+        </ng-container>
+      </div>
+    </mat-toolbar>
+    ```
+  </Tab>
+</Tabs>
+
+## Properties
+
+<ParamField path="expanded" type="boolean" default="false">
+  Controls the mobile menu visibility state
+</ParamField>
+
+<ParamField path="userData$" type="Observable<UserSessionData>">
+  Observable combining user email and authentication status from AuthService
+</ParamField>
+
+## Methods
+
+### logOut()
+
+Logs out the current user and navigates to the home page.
+
+```typescript
+logOut() {
+  this.authService.logOut();
+  this.router.navigate(['']);
+}
+```
+
+### toggleMenu()
+
+Toggles the mobile menu expansion state.
+
+```typescript
+toggleMenu() {
+  this.expanded = !this.expanded;
+}
+```
+
+## Navigation Links
+
+The navbar provides two main navigation routes:
+
+- **Search** (`/`): Main search page with exact route matching
+- **Favorites** (`/favorites`): User's saved favorites collection
+
+## Authentication States
+
+### Not Logged In
+
+- Displays "Join us!" button linking to registration
+- Shows login icon button
+
+### Logged In
+
+- Displays welcome message with user email
+- Shows logout button
+- Enables access to all navigation links
+
+## Responsive Behavior
+
+The navbar adapts to screen size:
+
+- **Desktop**: Shows all links inline with authentication controls
+- **Mobile**: Hamburger menu button reveals expanded drawer with navigation links
+
+## Dependencies
+
+- `@angular/material/toolbar`: Material toolbar component
+- `@angular/material/icon`: Material icons
+- `AuthService`: Manages authentication state
+- `Router`: Handles navigation

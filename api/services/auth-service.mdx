@@ -1,0 +1,280 @@
+---
+title: 'AuthService'
+description: 'Core authentication service for managing user sessions and authentication state'
+icon: 'shield-check'
+---
+
+## Overview
+
+The `AuthService` is a core Angular service that manages user authentication state, session storage, and provides reactive streams for authentication status. It handles JWT tokens, user information, and login/logout operations.
+
+## Import
+
+```typescript
+import { AuthService } from 'src/app/core/services/auth.service';
+import { AuthUser } from 'src/app/shared/models/auth.model';
+```
+
+## Properties
+
+### EventEmitters
+
+The service uses `BehaviorSubject` internally to provide reactive authentication state:
+
+<ResponseField name="userMailSubject" type="BehaviorSubject<string | null>" required>
+  Internal subject that emits the current user's email address
+</ResponseField>
+
+<ResponseField name="userLoggedInSubject" type="BehaviorSubject<boolean>" required>
+  Internal subject that emits the current authentication status
+</ResponseField>
+
+## Methods
+
+### setUserSession
+
+Stores the complete user session including auth token and user information.
+
+```typescript
+setUserSession(user: AuthUser, token: string): void
+```
+
+<ParamField path="user" type="AuthUser" required>
+  The authenticated user object containing email and name
+</ParamField>
+
+<ParamField path="token" type="string" required>
+  The JWT authentication token returned from the server
+</ParamField>
+
+**Example:**
+
+```typescript
+const user: AuthUser = { _id: '123', email: 'user@example.com', name: 'John Doe' };
+const token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...';
+
+authService.setUserSession(user, token);
+```
+
+---
+
+### setAuthToken
+
+Stores the authentication token in session storage and updates login state.
+
+```typescript
+setAuthToken(token: string): void
+```
+
+<ParamField path="token" type="string" required>
+  The JWT token to store
+</ParamField>
+
+---
+
+### getAuthToken
+
+Retrieves the current authentication token from session storage.
+
+```typescript
+getAuthToken(): string | null
+```
+
+<ResponseField name="return" type="string | null">
+  The stored JWT token, or null if not authenticated
+</ResponseField>
+
+**Example:**
+
+```typescript
+const token = authService.getAuthToken();
+if (token) {
+  // User is authenticated
+  console.log('Token:', token);
+}
+```
+
+---
+
+### isLoggedInObservable
+
+Provides an Observable stream of the user's authentication status.
+
+```typescript
+isLoggedInObservable(): Observable<boolean>
+```
+
+<ResponseField name="return" type="Observable<boolean>">
+  Observable that emits `true` when user is logged in, `false` otherwise
+</ResponseField>
+
+**Example:**
+
+```typescript
+authService.isLoggedInObservable().subscribe(isLoggedIn => {
+  if (isLoggedIn) {
+    console.log('User is authenticated');
+  } else {
+    console.log('User is not authenticated');
+  }
+});
+```
+
+---
+
+### setUserMail
+
+Stores the user's email address in session storage.
+
+```typescript
+setUserMail(userMail: string): void
+```
+
+<ParamField path="userMail" type="string" required>
+  The user's email address
+</ParamField>
+
+---
+
+### getUserMail
+
+Retrieves the user's email address from session storage.
+
+```typescript
+getUserMail(): string | null
+```
+
+<ResponseField name="return" type="string | null">
+  The user's email address, or null if not set
+</ResponseField>
+
+---
+
+### getUserMailObservable
+
+Provides an Observable stream of the user's email address.
+
+```typescript
+getUserMailObservable(): Observable<string | null>
+```
+
+<ResponseField name="return" type="Observable<string | null>">
+  Observable that emits the current user's email or null
+</ResponseField>
+
+**Example:**
+
+```typescript
+authService.getUserMailObservable().subscribe(email => {
+  console.log('Current user email:', email);
+});
+```
+
+---
+
+### setUserName
+
+Stores the user's name in session storage.
+
+```typescript
+setUserName(userName: string): void
+```
+
+<ParamField path="userName" type="string" required>
+  The user's display name
+</ParamField>
+
+---
+
+### getUserName
+
+Retrieves the user's name from session storage.
+
+```typescript
+getUserName(): string | null
+```
+
+<ResponseField name="return" type="string | null">
+  The user's name, or null if not set
+</ResponseField>
+
+---
+
+### logOut
+
+Clears all user session data and resets authentication state.
+
+```typescript
+logOut(): void
+```
+
+This method:
+- Removes auth token from session storage
+- Removes user email from session storage
+- Removes user name from session storage
+- Removes user ID from session storage
+- Emits `null` to userMailSubject
+- Emits `false` to userLoggedInSubject
+
+**Example:**
+
+```typescript
+authService.logOut();
+// User is now logged out and all session data is cleared
+```
+
+## Storage Keys
+
+The service uses the following session storage keys:
+
+- `authToken` - JWT authentication token
+- `userMail` - User's email address
+- `userName` - User's display name
+- `userId` - User's unique identifier
+
+## Usage Example
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { AuthService } from 'src/app/core/services/auth.service';
+import { UserService } from 'src/app/core/services/user.service';
+
+@Component({
+  selector: 'app-login',
+  templateUrl: './login.component.html'
+})
+export class LoginComponent {
+  constructor(
+    private authService: AuthService,
+    private userService: UserService
+  ) {}
+
+  login(email: string, password: string) {
+    this.userService.login({ email, password, name: '' }).subscribe({
+      next: (response) => {
+        // Store user session
+        this.authService.setUserSession(response.user, response.token);
+        
+        // Check authentication status
+        this.authService.isLoggedInObservable().subscribe(isLoggedIn => {
+          console.log('Logged in:', isLoggedIn);
+        });
+      },
+      error: (error) => {
+        console.error('Login failed:', error);
+      }
+    });
+  }
+
+  logout() {
+    this.authService.logOut();
+  }
+}
+```
+
+## Related
+
+- [UserService](/api/services/user-service) - For login and registration endpoints
+- [AuthUser Model](/api/models/auth-user) - User data structure
+- [AuthGuard](/api/guards/auth-guard) - Route protection using AuthService
+- [AuthInterceptor](/api/interceptors/auth-interceptor) - Automatic token injection

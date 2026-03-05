@@ -1,0 +1,414 @@
+---
+title: 'FavoritesService'
+description: 'Service for managing user favorite media items with full CRUD operations'
+icon: 'heart'
+---
+
+## Overview
+
+The `FavoritesService` manages user favorites with full CRUD (Create, Read, Update, Delete) operations. It automatically handles authentication tokens and provides EventEmitters for real-time updates across components.
+
+## Import
+
+```typescript
+import { FavoritesService } from 'src/app/shared/services/favorites/favorites.service';
+import { MediaItem } from 'src/app/shared/models/movie.model';
+import { FavoritesResponse } from 'src/app/shared/models/favoritesResponse.model';
+import { DeleteResponse } from 'src/app/shared/models/deleteResponse.model';
+```
+
+## Properties
+
+### EventEmitters
+
+<ResponseField name="favoriteDeleted" type="EventEmitter<string>" required>
+  Emits the ID of a deleted favorite media item. Components can subscribe to this to react to deletions.
+</ResponseField>
+
+<ResponseField name="favoriteUpdated" type="EventEmitter<MediaItem>" required>
+  Emits the updated MediaItem when a favorite is modified. Components can subscribe to this to react to updates.
+</ResponseField>
+
+## Methods
+
+### addToFavorites
+
+Adds a media item to the user's favorites list.
+
+```typescript
+addToFavorites(movie: MediaItem): Observable<MediaItem>
+```
+
+<ParamField path="movie" type="MediaItem" required>
+  The media item to add to favorites
+</ParamField>
+
+<ResponseField name="return" type="Observable<MediaItem>">
+  Observable that emits the created favorite item with server-generated fields (_id, createdAt, updatedAt)
+</ResponseField>
+
+**HTTP Details:**
+- Method: `POST`
+- Endpoint: `${environment.serverFavoritesURL}`
+- Headers: `Content-Type: application/json`, `Authorization: Bearer {token}`
+
+**Example:**
+
+```typescript
+const mediaItem: MediaItem = {
+  title: 'Inception',
+  year: '2010',
+  imdbID: 'tt1375666',
+  type: 'movie',
+  poster: 'https://example.com/poster.jpg',
+  description: 'A mind-bending thriller'
+};
+
+favoritesService.addToFavorites(mediaItem).subscribe({
+  next: (createdItem) => {
+    console.log('Added to favorites:', createdItem);
+    console.log('Favorite ID:', createdItem._id);
+  },
+  error: (error) => {
+    if (error.message === 'Media item already in favorites') {
+      console.log('Already in favorites');
+    }
+  }
+});
+```
+
+---
+
+### getFavorites
+
+Retrieves the user's favorite media items with pagination, sorting, and filtering.
+
+```typescript
+getFavorites(
+  currentPage: number,
+  pageSize: number,
+  sortField?: string,
+  sortOrder?: number,
+  searchTerm?: string,
+  mediaType?: string
+): Observable<FavoritesResponse>
+```
+
+<ParamField path="currentPage" type="number" required>
+  The page number to retrieve (starts at 1)
+</ParamField>
+
+<ParamField path="pageSize" type="number" required>
+  Number of items per page
+</ParamField>
+
+<ParamField path="sortField" type="string">
+  Field name to sort by (e.g., 'title', 'year', 'createdAt')
+</ParamField>
+
+<ParamField path="sortOrder" type="number">
+  Sort direction: `1` for ascending, `-1` for descending
+</ParamField>
+
+<ParamField path="searchTerm" type="string">
+  Search query to filter favorites by title
+</ParamField>
+
+<ParamField path="mediaType" type="string">
+  Filter by media type: `'movie'`, `'series'`, `'episode'`, or `'all'` for no filter
+</ParamField>
+
+<ResponseField name="return" type="Observable<FavoritesResponse>">
+  Observable that emits a FavoritesResponse containing favorites array and pagination metadata
+</ResponseField>
+
+**HTTP Details:**
+- Method: `GET`
+- Endpoint: `${environment.serverFavoritesURL}`
+- Headers: `Authorization: Bearer {token}`
+- Query Parameters: `page`, `pageSize`, `sortField`, `sortOrder`, `type`, `searchTerm`
+
+**Example:**
+
+```typescript
+// Basic pagination
+favoritesService.getFavorites(1, 10).subscribe({
+  next: (response) => {
+    console.log('Favorites:', response.favorites);
+    console.log('Total:', response.totalFavorites);
+    console.log('Current page:', response.currentPage);
+  }
+});
+
+// With sorting and filtering
+favoritesService.getFavorites(
+  1,           // page 1
+  20,          // 20 items per page
+  'title',     // sort by title
+  1,           // ascending order
+  'Batman',    // search for "Batman"
+  'movie'      // only movies
+).subscribe({
+  next: (response) => {
+    console.log('Filtered favorites:', response.favorites);
+  }
+});
+
+// Get all types (no filter)
+favoritesService.getFavorites(1, 10, undefined, undefined, undefined, 'all')
+  .subscribe(response => {
+    // All media types included
+  });
+```
+
+---
+
+### deleteMediaItem
+
+Deletes a favorite media item from the user's list.
+
+```typescript
+deleteMediaItem(mediaId: string): Observable<DeleteResponse>
+```
+
+<ParamField path="mediaId" type="string" required>
+  The unique ID (_id) of the favorite to delete
+</ParamField>
+
+<ResponseField name="return" type="Observable<DeleteResponse>">
+  Observable that emits a DeleteResponse with success message
+</ResponseField>
+
+**HTTP Details:**
+- Method: `DELETE`
+- Endpoint: `${environment.serverFavoritesURL}/{mediaId}`
+- Headers: `Authorization: Bearer {token}`
+
+**Example:**
+
+```typescript
+const favoriteId = '507f1f77bcf86cd799439011';
+
+favoritesService.deleteMediaItem(favoriteId).subscribe({
+  next: (response) => {
+    console.log('Delete response:', response.message);
+    // Response: { message: 'Success', data: {} }
+  },
+  error: (error) => {
+    if (error.status === 404) {
+      console.log('Favorite not found');
+    }
+  }
+});
+```
+
+---
+
+### updateFavorite
+
+Updates the description of a favorite media item.
+
+```typescript
+updateFavorite(mediaItem: MediaItem): Observable<MediaItem>
+```
+
+<ParamField path="mediaItem" type="MediaItem" required>
+  The media item with updated description (must include _id field)
+</ParamField>
+
+<ResponseField name="return" type="Observable<MediaItem>">
+  Observable that emits the updated MediaItem with all fields
+</ResponseField>
+
+**HTTP Details:**
+- Method: `PATCH`
+- Endpoint: `${environment.serverFavoritesURL}/{mediaItem._id}`
+- Headers: `Content-Type: application/json`, `Authorization: Bearer {token}`
+- Body: `{ description: string }`
+
+**Example:**
+
+```typescript
+const mediaItem: MediaItem = {
+  _id: '507f1f77bcf86cd799439011',
+  title: 'Inception',
+  year: '2010',
+  imdbID: 'tt1375666',
+  type: 'movie',
+  poster: 'https://example.com/poster.jpg',
+  description: 'Updated description: A masterpiece of cinema'
+};
+
+favoritesService.updateFavorite(mediaItem).subscribe({
+  next: (updatedItem) => {
+    console.log('Updated favorite:', updatedItem);
+    console.log('New description:', updatedItem.description);
+  },
+  error: (error) => {
+    console.error('Update failed:', error);
+  }
+});
+```
+
+## Authentication Token Handling
+
+All methods automatically retrieve the authentication token from `AuthService` and include it in the `Authorization` header:
+
+```typescript
+const token = this.authService.getAuthToken();
+const options = {
+  headers: new HttpHeaders({
+    'Authorization': `Bearer ${token}`
+  })
+};
+```
+
+If the token is invalid or expired, the [AuthInterceptor](/api/interceptors/auth-interceptor) will handle the 401 error and redirect to login.
+
+## Environment Configuration
+
+The service uses `environment.serverFavoritesURL` from the environment configuration:
+
+```typescript
+// environment.development.ts
+export const environment = {
+  serverFavoritesURL: 'http://localhost:3000/api/favorites'
+};
+```
+
+## EventEmitter Usage
+
+The service provides EventEmitters for real-time updates across components:
+
+```typescript
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { FavoritesService } from 'src/app/shared/services/favorites/favorites.service';
+import { Subscription } from 'rxjs';
+
+@Component({
+  selector: 'app-favorites-list',
+  templateUrl: './favorites-list.component.html'
+})
+export class FavoritesListComponent implements OnInit, OnDestroy {
+  private deleteSubscription: Subscription;
+  private updateSubscription: Subscription;
+
+  constructor(private favoritesService: FavoritesService) {}
+
+  ngOnInit() {
+    // Listen for deletions
+    this.deleteSubscription = this.favoritesService.favoriteDeleted.subscribe(
+      (deletedId) => {
+        console.log('Favorite deleted:', deletedId);
+        // Refresh the list or remove item from UI
+      }
+    );
+
+    // Listen for updates
+    this.updateSubscription = this.favoritesService.favoriteUpdated.subscribe(
+      (updatedItem) => {
+        console.log('Favorite updated:', updatedItem);
+        // Update the item in the UI
+      }
+    );
+  }
+
+  ngOnDestroy() {
+    this.deleteSubscription?.unsubscribe();
+    this.updateSubscription?.unsubscribe();
+  }
+}
+```
+
+## Complete Usage Example
+
+```typescript
+import { Component, OnInit } from '@angular/core';
+import { FavoritesService } from 'src/app/shared/services/favorites/favorites.service';
+import { MediaItem } from 'src/app/shared/models/movie.model';
+
+@Component({
+  selector: 'app-favorites',
+  templateUrl: './favorites.component.html'
+})
+export class FavoritesComponent implements OnInit {
+  favorites: MediaItem[] = [];
+  totalFavorites: number = 0;
+  currentPage: number = 1;
+  pageSize: number = 10;
+
+  constructor(private favoritesService: FavoritesService) {}
+
+  ngOnInit() {
+    this.loadFavorites();
+  }
+
+  loadFavorites() {
+    this.favoritesService.getFavorites(this.currentPage, this.pageSize)
+      .subscribe({
+        next: (response) => {
+          this.favorites = response.favorites;
+          this.totalFavorites = response.totalFavorites;
+        }
+      });
+  }
+
+  addFavorite(mediaItem: MediaItem) {
+    this.favoritesService.addToFavorites(mediaItem).subscribe({
+      next: (created) => {
+        this.favorites.push(created);
+        this.totalFavorites++;
+      },
+      error: (error) => {
+        console.error('Failed to add favorite:', error);
+      }
+    });
+  }
+
+  deleteFavorite(favoriteId: string) {
+    this.favoritesService.deleteMediaItem(favoriteId).subscribe({
+      next: () => {
+        this.favorites = this.favorites.filter(f => f._id !== favoriteId);
+        this.totalFavorites--;
+        this.favoritesService.favoriteDeleted.emit(favoriteId);
+      }
+    });
+  }
+
+  updateDescription(mediaItem: MediaItem, newDescription: string) {
+    mediaItem.description = newDescription;
+    this.favoritesService.updateFavorite(mediaItem).subscribe({
+      next: (updated) => {
+        const index = this.favorites.findIndex(f => f._id === updated._id);
+        if (index !== -1) {
+          this.favorites[index] = updated;
+        }
+        this.favoritesService.favoriteUpdated.emit(updated);
+      }
+    });
+  }
+
+  searchFavorites(searchTerm: string) {
+    this.favoritesService.getFavorites(
+      1,
+      this.pageSize,
+      'title',
+      1,
+      searchTerm
+    ).subscribe({
+      next: (response) => {
+        this.favorites = response.favorites;
+        this.totalFavorites = response.totalFavorites;
+      }
+    });
+  }
+}
+```
+
+## Related
+
+- [MediaItem Model](/api/models/media-item) - Media item structure
+- [FavoritesResponse Model](/api/models/media-item) - Response structure for getFavorites
+- [DeleteResponse Model](/api/models/media-item) - Response structure for deleteMediaItem
+- [AuthService](/api/services/auth-service) - Provides authentication tokens
+- [AuthInterceptor](/api/interceptors/auth-interceptor) - Handles token injection and auth errors

@@ -1,0 +1,445 @@
+---
+title: 'Installation'
+description: 'Complete installation guide for ScreenPulse with detailed prerequisites and troubleshooting'
+icon: 'download'
+---
+
+## Overview
+
+This guide provides comprehensive installation instructions for ScreenPulse, including system requirements, step-by-step setup, and solutions to common issues.
+
+## System Requirements
+
+### Required Software
+
+ScreenPulse requires the following software to be installed on your system:
+
+<CardGroup cols={2}>
+  <Card title="Node.js" icon="node-js">
+    **Version:** v18.19.1 (LTS) or higher
+    
+    **Download:** [nodejs.org](https://nodejs.org/)
+    
+    Verify installation:
+    ```bash
+    node --version
+    ```
+  </Card>
+
+  <Card title="npm" icon="npm">
+    **Version:** v8.0.0 or higher
+    
+    Included with Node.js installation
+    
+    Verify installation:
+    ```bash
+    npm --version
+    ```
+  </Card>
+
+  <Card title="Angular CLI" icon="angular">
+    **Version:** v16.2.16
+    
+    Install globally:
+    ```bash
+    npm install -g @angular/cli@16.2.16
+    ```
+    
+    Verify installation:
+    ```bash
+    ng version
+    ```
+  </Card>
+
+  <Card title="Git" icon="git">
+    **Version:** Latest stable
+    
+    **Download:** [git-scm.com](https://git-scm.com/)
+    
+    Verify installation:
+    ```bash
+    git --version
+    ```
+  </Card>
+</CardGroup>
+
+<Warning>
+  ScreenPulse uses Angular 16.2.12, which has specific Node.js version requirements. Node.js v18.x LTS is strongly recommended for best compatibility.
+</Warning>
+
+### Recommended Software
+
+For an optimal development experience, we recommend:
+
+- **Visual Studio Code** - Lightweight code editor with excellent Angular support
+- **Chrome** or **Firefox** - Modern browsers with DevTools
+- **Angular DevTools** - Browser extension for debugging Angular applications
+
+## Installation Steps
+
+<Steps>
+  <Step title="Verify Prerequisites">
+    Before installing ScreenPulse, verify all prerequisites are met:
+
+    ```bash
+    # Check Node.js version (should be 18.19.1 or higher)
+    node --version
+
+    # Check npm version (should be 8.0.0 or higher)
+    npm --version
+
+    # Check Angular CLI version (should be 16.2.16)
+    ng version
+
+    # Check Git version
+    git --version
+    ```
+
+    <Note>
+      If any of these commands fail, install the missing software before continuing.
+    </Note>
+  </Step>
+
+  <Step title="Clone the Repository">
+    Clone the ScreenPulse frontend application from GitHub:
+
+    ```bash
+    git clone https://github.com/EduGese/ScreenPulse-frontApp.git
+    ```
+
+    Navigate to the project directory:
+
+    ```bash
+    cd ScreenPulse-frontApp
+    ```
+  </Step>
+
+  <Step title="Install Dependencies">
+    Install all required npm packages:
+
+    <CodeGroup>
+      ```bash npm
+      npm install
+      ```
+
+      ```bash yarn
+      yarn install
+      ```
+
+      ```bash pnpm
+      pnpm install
+      ```
+    </CodeGroup>
+
+    This installs:
+
+    **Core Dependencies:**
+    - `@angular/core@16.2.0` - Angular framework
+    - `@angular/material@16.2.12` - Material Design components
+    - `@ng-bootstrap/ng-bootstrap@15.1.2` - Bootstrap 5 components
+    - `rxjs@7.8.0` - Reactive Extensions for JavaScript
+    - `ngx-toastr@18.0.0` - Toast notifications
+    - `bootstrap@5.2.3` - Bootstrap CSS framework
+
+    **Development Tools:**
+    - `@angular/cli@16.2.16` - Angular command-line interface
+    - `@storybook/angular@8.3.7` - Component documentation
+    - `typescript@5.1.3` - TypeScript compiler
+    - `jasmine-core@4.6.0` & `karma@6.4.0` - Testing framework
+    - `eslint@9.23.0` - Code linting
+
+    <Tip>
+      The installation may take 2-5 minutes depending on your internet connection and system performance.
+    </Tip>
+  </Step>
+
+  <Step title="Verify Installation">
+    Verify the installation was successful by checking the project structure:
+
+    ```bash
+    # List installed packages
+    npm list --depth=0
+
+    # Check Angular CLI can detect the project
+    ng version
+    ```
+
+    You should see Angular CLI v16.2.16 and the project packages listed.
+  </Step>
+
+  <Step title="Start Development Server">
+    Test that everything is working by starting the development server:
+
+    <CodeGroup>
+      ```bash npm
+      npm start
+      ```
+
+      ```bash Angular CLI
+      ng serve
+      ```
+    </CodeGroup>
+
+    Wait for the compilation to complete. You should see:
+
+    ```
+    ** Angular Live Development Server is listening on localhost:4200 **
+    ✔ Compiled successfully.
+    ```
+  </Step>
+
+  <Step title="Open in Browser">
+    Open your web browser and navigate to:
+
+    ```
+    http://localhost:4200/
+    ```
+
+    You should see the ScreenPulse home page load successfully.
+
+    <Note>
+      If the page doesn't load, check the terminal for compilation errors and refer to the troubleshooting section below.
+    </Note>
+  </Step>
+</Steps>
+
+## Environment Configuration
+
+After installation, ScreenPulse uses environment files for API configuration:
+
+```
+src/environments/
+├── environment.development.ts  # Development settings (default)
+├── environment.production.ts   # Production settings
+└── environment.ts             # Base environment file
+```
+
+<Note>
+  By default, ScreenPulse connects to the production backend API at `screenpulse-api.onrender.com`. To use a local backend, see the [Configuration Guide](/setup/configuration).
+</Note>
+
+## Verify Installation
+
+Run these commands to ensure everything is set up correctly:
+
+```bash
+# Run linter
+npm run lint
+
+# Run tests
+npm test
+
+# Build for production
+npm run build
+```
+
+All commands should complete without errors.
+
+## Troubleshooting Common Issues
+
+<AccordionGroup>
+  <Accordion title="Node.js version mismatch">
+    **Problem:** Angular requires a specific Node.js version range.
+
+    **Solution:**
+    
+    1. Check your Node.js version:
+    ```bash
+    node --version
+    ```
+
+    2. If you have the wrong version, install Node.js v18.19.1 LTS:
+       - Download from [nodejs.org](https://nodejs.org/)
+       - Or use a version manager like `nvm`:
+
+    ```bash
+    # Using nvm
+    nvm install 18.19.1
+    nvm use 18.19.1
+    ```
+
+    3. Verify the correct version is active:
+    ```bash
+    node --version  # Should show v18.19.1
+    ```
+
+    4. Reinstall dependencies:
+    ```bash
+    rm -rf node_modules package-lock.json
+    npm install
+    ```
+  </Accordion>
+
+  <Accordion title="npm install fails with permission errors">
+    **Problem:** Permission denied errors during `npm install`.
+
+    **Solution:**
+
+    **On Linux/Mac:**
+    ```bash
+    # Fix npm permissions (recommended)
+    mkdir ~/.npm-global
+    npm config set prefix '~/.npm-global'
+    echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
+    source ~/.bashrc
+    ```
+
+    **On Windows:**
+    Run your terminal as Administrator, or:
+    ```bash
+    npm install --global --production windows-build-tools
+    ```
+
+    Avoid using `sudo npm install` as it can cause permission issues later.
+  </Accordion>
+
+  <Accordion title="Port 4200 already in use">
+    **Problem:** `ng serve` fails because port 4200 is already in use.
+
+    **Solution:**
+
+    **Option 1: Use a different port**
+    ```bash
+    ng serve --port 4300
+    ```
+
+    **Option 2: Kill the process using port 4200**
+
+    On Linux/Mac:
+    ```bash
+    lsof -ti:4200 | xargs kill -9
+    ```
+
+    On Windows:
+    ```bash
+    netstat -ano | findstr :4200
+    taskkill /PID <PID> /F
+    ```
+  </Accordion>
+
+  <Accordion title="Module not found errors">
+    **Problem:** Import errors like `Cannot find module '@angular/core'`.
+
+    **Solution:**
+
+    1. Delete `node_modules` and `package-lock.json`:
+    ```bash
+    rm -rf node_modules package-lock.json
+    ```
+
+    2. Clear npm cache:
+    ```bash
+    npm cache clean --force
+    ```
+
+    3. Reinstall dependencies:
+    ```bash
+    npm install
+    ```
+
+    4. If the issue persists, check your Node.js version:
+    ```bash
+    node --version  # Should be 18.x
+    ```
+  </Accordion>
+
+  <Accordion title="Angular CLI not found">
+    **Problem:** Command `ng` not recognized.
+
+    **Solution:**
+
+    Install Angular CLI globally:
+    ```bash
+    npm install -g @angular/cli@16.2.16
+    ```
+
+    Verify installation:
+    ```bash
+    ng version
+    ```
+
+    If still not working, check your PATH:
+    ```bash
+    # On Linux/Mac
+    echo $PATH
+
+    # On Windows
+    echo %PATH%
+    ```
+
+    Ensure npm's global bin directory is in your PATH.
+  </Accordion>
+
+  <Accordion title="Compilation errors on first run">
+    **Problem:** TypeScript compilation errors when running `ng serve`.
+
+    **Solution:**
+
+    1. Ensure you're using TypeScript 5.1.x:
+    ```bash
+    npm list typescript
+    ```
+
+    2. If wrong version, reinstall:
+    ```bash
+    npm install --save-dev typescript@5.1.3
+    ```
+
+    3. Clear Angular cache:
+    ```bash
+    rm -rf .angular
+    ```
+
+    4. Restart the dev server:
+    ```bash
+    npm start
+    ```
+  </Accordion>
+
+  <Accordion title="Build fails with memory errors">
+    **Problem:** Build process fails with JavaScript heap out of memory.
+
+    **Solution:**
+
+    Increase Node.js memory limit:
+    ```bash
+    # Increase to 4GB
+    export NODE_OPTIONS="--max-old-space-size=4096"
+    npm run build
+    ```
+
+    Or add to package.json scripts:
+    ```json
+    "scripts": {
+      "build": "node --max-old-space-size=4096 node_modules/@angular/cli/bin/ng build"
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Environment Setup" icon="gear" href="/setup/environment">
+    Configure Node.js, Angular CLI, and recommended tools
+  </Card>
+  
+  <Card title="Configuration" icon="sliders" href="/setup/configuration">
+    Set up API endpoints and environment variables
+  </Card>
+  
+  <Card title="Development Workflow" icon="code" href="/setup/development">
+    Learn the development process and available tools
+  </Card>
+  
+  <Card title="Architecture" icon="sitemap" href="/concepts/architecture">
+    Understand the ScreenPulse application structure
+  </Card>
+</CardGroup>
+
+## Additional Resources
+
+- **Official Documentation:** [angular.io/docs](https://angular.io/docs)
+- **ScreenPulse Backend:** [GitHub Repository](https://github.com/EduGese/ScreenPulse-backend-Api)
+- **Component Library:** [Storybook Documentation](https://edugese.github.io/ScreenPulse-frontApp/)
+- **Angular CLI Reference:** [angular.io/cli](https://angular.io/cli)

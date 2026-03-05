@@ -1,0 +1,313 @@
+---
+title: 'Error Handling'
+description: 'Learn how ScreenPulse handles errors with HTTP interceptors, toast notifications, and RxJS operators'
+icon: 'triangle-exclamation'
+---
+
+## Overview
+
+ScreenPulse uses a centralized error handling approach with Angular's HTTP interceptors and ngx-toastr for user-friendly error notifications. This guide covers the error handling patterns used throughout the application.
+
+## Error Interceptor
+
+### Implementation
+
+The `ErrorInterceptor` is the core component for handling HTTP errors globally. It intercepts all HTTP responses and transforms errors into user-friendly messages.
+
+<CodeGroup>
+```typescript error.interceptor.ts
+import { Injectable } from '@angular/core';
+import {
+  HttpEvent,
+  HttpInterceptor,
+  HttpHandler,
+  HttpRequest,
+  HttpErrorResponse
+} from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+
+@Injectable()
+export class ErrorInterceptor implements HttpInterceptor {
+  intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    return next.handle(req).pipe(
+      catchError((error: HttpErrorResponse) => {
+        let message = 'An unknown error occurred.';
+        switch (error.status) {
+          case 0:
+            message = 'Cannot connect to server. Please check your internet connection';
+            break;
+          case 401:
+            message = 'Unauthorized access. Please try it again';
+             if (error.error.code === 'AUTH_TOKEN_EXPIRED') {
+              message = 'Session expired. Please login again';
+            }
+            break;
+          case 404:
+            message = 'The favorite you are trying to delete could not be found in your list. Please try again later.';
+            break;
+          case 409:
+            if (error.error.code === 'USER_EXISTS') {
+              message = 'User with this email already exists';
+            }
+            if (error.error.code === 'FAVORITE_EXISTS') {
+              message = 'Media item already in favorites';
+            }
+            break;
+          default:
+            message = 'An unexpected error occurred. Please try again later';
+            break;
+        }
+
+        return throwError(() => ({
+          message,
+          status: error.status,
+        }));
+      })
+    );
+  }
+}
+```
+</CodeGroup>
+
+### Error Status Codes
+
+The interceptor handles different HTTP status codes:
+
+<Accordion title="Status Code 0 - Network Error">
+  **Scenario**: Server is unreachable or network connectivity issues
+  
+  **Message**: "Cannot connect to server. Please check your internet connection"
+  
+  **Use Case**: When the user is offline or the backend server is down
+</Accordion>
+
+<Accordion title="Status Code 401 - Unauthorized">
+  **Scenario**: Authentication required or token expired
+  
+  **Messages**: 
+  - Default: "Unauthorized access. Please try it again"
+  - Token expired: "Session expired. Please login again"
+  
+  **Use Case**: When accessing protected routes without valid authentication
+</Accordion>
+
+<Accordion title="Status Code 404 - Not Found">
+  **Scenario**: Resource not found
+  
+  **Message**: "The favorite you are trying to delete could not be found in your list. Please try again later."
+  
+  **Use Case**: Attempting to delete a favorite that doesn't exist
+</Accordion>
+
+<Accordion title="Status Code 409 - Conflict">
+  **Scenario**: Resource conflict
+  
+  **Messages**:
+  - `USER_EXISTS`: "User with this email already exists"
+  - `FAVORITE_EXISTS`: "Media item already in favorites"
+  
+  **Use Case**: Duplicate user registration or adding duplicate favorites
+</Accordion>
+
+## Toast Notifications
+
+### Configuration
+
+ScreenPulse uses **ngx-toastr** for displaying error messages to users. The library is imported globally:
+
+```scss styles.scss
+@import 'ngx-toastr/toastr';
+```
+
+<Note>
+  Toast notifications provide non-intrusive feedback to users without blocking the UI, making error handling more user-friendly.
+</Note>
+
+### Usage in Services
+
+Services catch errors from the interceptor and display toast notifications:
+
+<CodeGroup>
+```typescript favorites.service.ts
+deleteMediaItem(mediaId: string): Observable<DeleteResponse> {
+  const token = this.authService.getAuthToken();
+  const options = {
+    headers: new HttpHeaders({
+      'Authorization': `Bearer ${token}`
+    })
+  };
+  return this.http.delete<DeleteResponse>(`${this.baseUrl}/${mediaId}`, options);
+}
+```
+
+```typescript component-usage.ts
+// In component:
+this.favoritesService.deleteMediaItem(id).subscribe({
+  next: (response) => {
+    this.toastr.success('Favorite deleted successfully');
+  },
+  error: (error) => {
+    this.toastr.error(error.message); // Message from ErrorInterceptor
+  }
+});
+```
+</CodeGroup>
+
+## RxJS Error Handling Patterns
+
+### catchError Operator
+
+The `catchError` operator is used throughout services to handle errors gracefully:
+
+<Steps>
+  <Step title="Import the operator">
+    ```typescript
+    import { catchError } from 'rxjs/operators';
+    import { throwError } from 'rxjs';
+    ```
+  </Step>
+  
+  <Step title="Apply in pipe">
+    ```typescript
+    return this.http.get(url).pipe(
+      catchError((error: HttpErrorResponse) => {
+        // Transform error
+        return throwError(() => ({ message: 'Custom message', status: error.status }));
+      })
+    );
+    ```
+  </Step>
+  
+  <Step title="Handle in component">
+    ```typescript
+    this.service.getData().subscribe({
+      next: (data) => this.handleData(data),
+      error: (error) => this.toastr.error(error.message)
+    });
+    ```
+  </Step>
+</Steps>
+
+### Service Error Handling Example
+
+Here's how the `OmdbService` handles errors:
+
+```typescript omdb.service.ts
+fetchMediaItems(title: string, type: string, year: string, page: number): Observable<OmdbResponse> {
+  const options = {
+    params: new HttpParams()
+      .set('title', title.trim())
+      .set('type', type)
+      .set('year', year)
+      .set('page', page.toString())
+  };
+  return this.http.get<OmdbResponse>(`${environment.serverSearchURL}`, options)
+  // Error handling is done by ErrorInterceptor
+}
+```
+
+<Tip>
+  The `ErrorInterceptor` automatically catches all HTTP errors, so individual services don't need to implement `catchError` unless they need custom error handling logic.
+</Tip>
+
+## Best Practices
+
+### 1. Centralized Error Messages
+
+Keep all error messages in the interceptor for consistency:
+
+```typescript
+// ✅ Good - Centralized in interceptor
+case 409:
+  if (error.error.code === 'FAVORITE_EXISTS') {
+    message = 'Media item already in favorites';
+  }
+  break;
+
+// ❌ Bad - Scattered across components
+this.toastr.error('Media item already in favorites');
+```
+
+### 2. Use Error Codes
+
+Leverage backend error codes for specific messages:
+
+```typescript
+if (error.error.code === 'AUTH_TOKEN_EXPIRED') {
+  message = 'Session expired. Please login again';
+}
+```
+
+### 3. Graceful Degradation
+
+Always provide a default error message:
+
+```typescript
+default:
+  message = 'An unexpected error occurred. Please try again later';
+  break;
+```
+
+### 4. Error Response Structure
+
+Return consistent error objects:
+
+```typescript
+return throwError(() => ({
+  message,     // User-friendly message
+  status: error.status  // HTTP status code
+}));
+```
+
+## Complete Example
+
+Here's a complete example of error handling in the `FavoritesService`:
+
+```typescript favorites.service.ts
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { Injectable } from '@angular/core';
+import { Observable } from 'rxjs';
+import { AuthService } from 'src/app/core/services/auth.service';
+
+addToFavorites(movie: MediaItem): Observable<MediaItem> {
+  const token = this.authService.getAuthToken();
+  const options = {
+    headers: new HttpHeaders({
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    }),
+  };
+  return this.http.post<MediaItem>(this.baseUrl, movie, options)
+  // ErrorInterceptor will catch:
+  // - 401: Token expired
+  // - 409: Duplicate favorite (FAVORITE_EXISTS)
+  // - 0: Network error
+}
+```
+
+```typescript component.ts
+// Component usage
+addFavorite(movie: MediaItem) {
+  this.favoritesService.addToFavorites(movie).subscribe({
+    next: (response) => {
+      this.toastr.success('Added to favorites!');
+    },
+    error: (error) => {
+      // Error.message comes from ErrorInterceptor
+      this.toastr.error(error.message);
+    }
+  });
+}
+```
+
+## Related Resources
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="shield-halved" href="/guides/authentication">
+    Learn about handling auth-related errors
+  </Card>
+  <Card title="API Integration" icon="plug" href="/guides/api-integration">
+    Understand HTTP service patterns
+  </Card>
+</CardGroup>

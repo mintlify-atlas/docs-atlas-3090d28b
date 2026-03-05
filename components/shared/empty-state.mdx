@@ -1,0 +1,288 @@
+---
+title: 'Empty State'
+description: 'Friendly empty state component with customizable message and image'
+icon: 'circle-exclamation'
+---
+
+## Overview
+
+The Empty State component displays a friendly message and image when no data is available. It's used in the favorites page when the user has no saved items or when search/filter results are empty.
+
+**Location**: `src/app/shared/components/empty-state/empty-state.component.ts`
+
+## Key Features
+
+- **Customizable Message**: Override default "no results" text
+- **Customizable Image**: Provide custom illustration URL
+- **Accessible**: Includes alt text for images
+- **Default Styling**: Pre-configured with friendly defaults
+
+## Component Structure
+
+```typescript
+@Component({
+  selector: 'app-empty-state',
+  templateUrl: './empty-state.component.html',
+  styleUrls: ['./empty-state.component.scss']
+})
+export class EmptyStateComponent {
+  @Input() message = "Upps..We didn't find anything...";
+  @Input() imageUrl = "/assets/images/monkey3.jpg";
+  @Input() alt = 'empty state image';
+}
+```
+
+## Input Properties
+
+<ParamField path="message" type="string" default="Upps..We didn't find anything...">
+  The message displayed to the user when there's no data. Can be customized for different contexts.
+</ParamField>
+
+<ParamField path="imageUrl" type="string" default="/assets/images/monkey3.jpg">
+  URL of the image to display. Defaults to a friendly monkey illustration.
+</ParamField>
+
+<ParamField path="alt" type="string" default="empty state image">
+  Alt text for the image for accessibility.
+</ParamField>
+
+## Usage
+
+### Basic Usage (Default)
+
+```html
+<app-empty-state></app-empty-state>
+```
+
+Displays:
+- Message: "Upps..We didn't find anything..."
+- Image: Default monkey illustration
+
+### Custom Message
+
+```html
+<app-empty-state 
+  message="No favorites yet! Start adding some movies.">
+</app-empty-state>
+```
+
+### Custom Message and Image
+
+```html
+<app-empty-state 
+  message="No search results found. Try different keywords."
+  imageUrl="/assets/images/no-results.png"
+  alt="No results illustration">
+</app-empty-state>
+```
+
+### In Favorites Page
+
+```html
+<div class="all-favorites-card">
+  <ng-container *ngFor="let item of favorites; trackBy : trackByFn">
+    <app-favorites-card [item]="item"></app-favorites-card>
+  </ng-container>
+  
+  <ng-container *ngIf="favorites.length === 0 && !isRevalidatingAfterDelete">
+    <app-empty-state></app-empty-state>
+  </ng-container>
+</div>
+```
+
+## Template Structure
+
+```html
+<h1>{{ message }}</h1>
+<div class="img-container">
+  <img [src]="imageUrl" [alt]="alt" />
+</div>
+```
+
+## Use Cases
+
+### 1. No Favorites
+
+```html
+<app-empty-state 
+  message="Your favorites collection is empty. Start exploring!">
+</app-empty-state>
+```
+
+### 2. Empty Search Results
+
+```html
+<app-empty-state 
+  message="No movies match your search criteria.">
+</app-empty-state>
+```
+
+### 3. Empty Filter Results
+
+```html
+<app-empty-state 
+  message="No items match the selected filters.">
+</app-empty-state>
+```
+
+### 4. No Data After Delete
+
+```typescript
+// In favorites component
+if (this.favorites.length === 0 && !this.isRevalidatingAfterDelete) {
+  // Show empty state
+}
+```
+
+## Conditional Display
+
+Always wrap the empty state in a conditional to only show when appropriate:
+
+```html
+<!-- Good: Shows only when array is empty -->
+<ng-container *ngIf="items.length === 0">
+  <app-empty-state></app-empty-state>
+</ng-container>
+
+<!-- Good: Shows after filtering -->
+<ng-container *ngIf="filteredItems.length === 0 && !isLoading">
+  <app-empty-state message="No results found for your search."></app-empty-state>
+</ng-container>
+
+<!-- Bad: Always shows -->
+<app-empty-state></app-empty-state>
+```
+
+## Styling
+
+The component uses scoped styles in `empty-state.component.scss`:
+
+```scss
+:host {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+}
+
+h1 {
+  font-size: 1.5rem;
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+}
+
+.img-container {
+  max-width: 400px;
+  
+  img {
+    width: 100%;
+    height: auto;
+  }
+}
+```
+
+## Best Practices
+
+### 1. Provide Context
+
+Make the message specific to the situation:
+
+```html
+<!-- Good: Specific -->
+<app-empty-state message="No movies in your watchlist yet."></app-empty-state>
+
+<!-- Bad: Generic -->
+<app-empty-state message="Empty."></app-empty-state>
+```
+
+### 2. Wait for Loading
+
+Don't show empty state while data is loading:
+
+```html
+<ng-container *ngIf="isLoading">
+  <app-loading-spinner [visible]="true"></app-loading-spinner>
+</ng-container>
+
+<ng-container *ngIf="!isLoading && items.length === 0">
+  <app-empty-state></app-empty-state>
+</ng-container>
+```
+
+### 3. Provide Next Steps
+
+Consider adding action buttons below the empty state:
+
+```html
+<app-empty-state message="Your favorites list is empty."></app-empty-state>
+<button mat-raised-button color="primary" routerLink="/">
+  Browse Movies
+</button>
+```
+
+### 4. Use Appropriate Images
+
+Choose images that match the context:
+
+- **No favorites**: Heart or bookmark illustration
+- **No search results**: Magnifying glass
+- **No data**: Empty box or folder
+- **Error state**: Warning icon
+
+## Accessibility
+
+Ensure the empty state is accessible:
+
+```html
+<div role="status" aria-live="polite">
+  <app-empty-state 
+    message="No results found"
+    alt="Illustration of empty search results">
+  </app-empty-state>
+</div>
+```
+
+## Common Patterns
+
+### With Loading State
+
+```typescript
+export class FavoritesComponent {
+  favorites: MediaItem[] = [];
+  isLoading = false;
+  
+  ngOnInit(): void {
+    this.isLoading = true;
+    this.loadFavorites();
+  }
+}
+```
+
+```html
+<app-loading-spinner [visible]="isLoading"></app-loading-spinner>
+
+<ng-container *ngIf="!isLoading">
+  <div class="items-container" *ngIf="favorites.length > 0">
+    <!-- Display items -->
+  </div>
+  
+  <app-empty-state *ngIf="favorites.length === 0"></app-empty-state>
+</ng-container>
+```
+
+### With Filters
+
+```typescript
+get hasActiveFilters(): boolean {
+  return this.searchParams.mediaType || this.searchParams.searchTerm;
+}
+```
+
+```html
+<app-empty-state 
+  *ngIf="filteredItems.length === 0"
+  [message]="hasActiveFilters ? 'No items match your filters.' : 'Your collection is empty.'">
+</app-empty-state>
+```

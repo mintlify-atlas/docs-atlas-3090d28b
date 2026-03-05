@@ -1,0 +1,308 @@
+---
+title: 'Routing'
+description: 'Application routing with lazy loading and route guards'
+---
+
+ScreenPulse uses Angular Router to manage navigation between features. Routes are configured with **lazy loading** to optimize performance and **guards** to protect authenticated routes.
+
+## Route Configuration
+
+The main routing configuration defines top-level routes with lazy-loaded feature modules:
+
+```typescript title="src/app/app-routing.module.ts"
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { AuthGuard } from './core/guards/auth.guard';
+
+const routes: Routes = [
+  { 
+    path: '', 
+    loadChildren: () => import('./pages/search/search.module')
+      .then(m => m.SearchModule) 
+  },
+  
+  { 
+    path: 'favorites',
+    canActivate: [AuthGuard], 
+    loadChildren: () => import('./pages/favorites/favorites.module')
+      .then(m => m.FavoritesModule) 
+  },
+  
+  { 
+    path: 'auth', 
+    loadChildren: () => import('./pages/auth/auth.module')
+      .then(m => m.AuthModule) 
+  },
+  
+  { 
+    path: '**', 
+    redirectTo: '' 
+  }
+];
+
+@NgModule({
+  imports: [RouterModule.forRoot(routes)],
+  exports: [RouterModule]
+})
+export class AppRoutingModule { }
+```
+
+## Lazy Loading
+
+Instead of loading all features upfront, ScreenPulse uses the `loadChildren` property to load feature modules **on-demand**:
+
+```typescript
+{
+  path: 'favorites',
+  loadChildren: () => import('./pages/favorites/favorites.module')
+    .then(m => m.FavoritesModule)
+}
+```
+
+<Info>
+When a user navigates to `/favorites`, Angular downloads the FavoritesModule bundle and its dependencies, then instantiates the module and displays the appropriate component.
+</Info>
+
+### Benefits of Lazy Loading
+
+<CardGroup cols={2}>
+  <Card title="Faster Initial Load" icon="bolt">
+    Users download only the code needed for the initial route, reducing time-to-interactive.
+  </Card>
+  <Card title="Smaller Bundles" icon="download">
+    Each feature is bundled separately, allowing browsers to cache and load them independently.
+  </Card>
+  <Card title="Better Performance" icon="gauge-high">
+    Features are loaded in the background as users navigate, providing a smooth experience.
+  </Card>
+  <Card title="Scalable" icon="arrow-up-right-dots">
+    Add new features without impacting the size of existing bundles.
+  </Card>
+</CardGroup>
+
+## Route Protection with Guards
+
+The **AuthGuard** protects routes that require authentication, such as the favorites page:
+
+```typescript title="src/app/core/guards/auth.guard.ts"
+import { Injectable } from '@angular/core';
+import { CanActivate, Router } from '@angular/router';
+import { AuthService } from '../services/auth.service';
+import { Observable } from 'rxjs';
+import { tap, take } from 'rxjs/operators';
+import { ToastrService } from 'ngx-toastr';
+
+@Injectable({
+  providedIn: 'root'
+})
+export class AuthGuard implements CanActivate {
+  constructor(
+    private authService: AuthService,
+    private router: Router,
+    private toastService: ToastrService
+  ) { }
+
+  canActivate(): Observable<boolean> {
+    return this.authService.isLoggedInObservable().pipe(
+      take(1),
+      tap(loggedIn => {
+        if (!loggedIn) {
+          this.toastService.warning(
+            'You must be logged in to access this page.',
+            'Access Denied'
+          );
+          this.router.navigate(['/auth/login']);
+        }
+      })
+    );
+  }
+}
+```
+
+### How Guards Work
+
+<Steps>
+  <Step title="User navigates to protected route">
+    User clicks a link or enters URL for `/favorites`
+  </Step>
+  
+  <Step title="Router calls canActivate()">
+    Angular Router invokes the AuthGuard's `canActivate()` method
+  </Step>
+  
+  <Step title="Guard checks authentication">
+    Guard subscribes to `AuthService.isLoggedInObservable()` to check auth state
+  </Step>
+  
+  <Step title="Route activation or redirect">
+    - If authenticated: Returns `true`, route loads
+    - If not authenticated: Shows warning toast, redirects to `/auth/login`
+  </Step>
+</Steps>
+
+<Note>
+The `take(1)` operator ensures the subscription completes after checking authentication once, preventing memory leaks.
+</Note>
+
+## Feature Module Routing
+
+Each feature module has its own routing configuration:
+
+```typescript title="src/app/pages/search/search-routing.module.ts"
+import { NgModule } from '@angular/core';
+import { RouterModule, Routes } from '@angular/router';
+import { SearchComponent } from './page/search.component';
+
+const routes: Routes = [
+  {
+    path: '',
+    component: SearchComponent
+  }
+];
+
+@NgModule({
+  imports: [RouterModule.forChild(routes)],
+  exports: [RouterModule]
+})
+export class SearchRoutingModule { }
+```
+
+<Tip>
+Notice `RouterModule.forChild(routes)` instead of `forRoot()`. Use `forRoot()` only in AppRoutingModule, and `forChild()` in all feature modules.
+</Tip>
+
+## Wildcard Route
+
+The wildcard route (`**`) catches all unmatched URLs and redirects to the home page:
+
+```typescript
+{ 
+  path: '**', 
+  redirectTo: '' 
+}
+```
+
+<Warning>
+Always place the wildcard route **last** in your routes array. Routes are matched in order, so the wildcard would catch everything if placed earlier.
+</Warning>
+
+## Navigation in Components
+
+Components use the `Router` service to navigate programmatically:
+
+```typescript title="src/app/layout/navbar/navbar.component.ts"
+import { Router } from '@angular/router';
+import { AuthService } from 'src/app/core/services/auth.service';
+
+export class NavbarComponent {
+  constructor(
+    private authService: AuthService,
+    private router: Router
+  ) { }
+
+  logOut() {
+    this.authService.logOut();
+    this.router.navigate(['']);
+  }
+}
+```
+
+### Navigation Methods
+
+<AccordionGroup>
+  <Accordion title="router.navigate()">
+    Navigate using an array of route segments:
+    ```typescript
+    this.router.navigate(['/favorites']);
+    this.router.navigate(['/auth', 'login']);
+    ```
+  </Accordion>
+  
+  <Accordion title="router.navigateByUrl()">
+    Navigate using a full URL string:
+    ```typescript
+    this.router.navigateByUrl('/auth/login');
+    ```
+  </Accordion>
+  
+  <Accordion title="routerLink directive">
+    Navigate declaratively in templates:
+    ```html
+    <a routerLink="/favorites">My Favorites</a>
+    <a [routerLink]="['/auth', 'login']">Login</a>
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## Route Parameters
+
+While ScreenPulse primarily uses simple routes, Angular supports route parameters for dynamic URLs:
+
+```typescript
+// Route configuration
+{ path: 'movie/:id', component: MovieDetailComponent }
+
+// Component
+export class MovieDetailComponent implements OnInit {
+  constructor(private route: ActivatedRoute) { }
+  
+  ngOnInit() {
+    const id = this.route.snapshot.paramMap.get('id');
+    // Or use observable for parameter changes:
+    this.route.paramMap.subscribe(params => {
+      const id = params.get('id');
+    });
+  }
+}
+```
+
+## Routing Best Practices
+
+<Steps>
+  <Step title="Use lazy loading for feature modules">
+    Load features on-demand to reduce initial bundle size
+  </Step>
+  
+  <Step title="Protect sensitive routes with guards">
+    Use `CanActivate` guards to enforce authentication requirements
+  </Step>
+  
+  <Step title="Order routes from specific to general">
+    Place wildcard routes last, and more specific routes before general ones
+  </Step>
+  
+  <Step title="Use forChild() in feature modules">
+    Only use `RouterModule.forRoot()` once in AppRoutingModule
+  </Step>
+  
+  <Step title="Unsubscribe from route observables">
+    Use `take(1)` or store subscriptions to prevent memory leaks
+  </Step>
+</Steps>
+
+## Route Structure
+
+```
+/                    → SearchModule (lazy-loaded)
+/favorites           → FavoritesModule (lazy-loaded, AuthGuard protected)
+/auth/login          → AuthModule → LoginComponent (lazy-loaded)
+/auth/register       → AuthModule → RegisterComponent (lazy-loaded)
+/**                  → Redirect to /
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Lazy Loading" icon="rocket" href="/concepts/lazy-loading">
+    Deep dive into lazy loading and code splitting
+  </Card>
+  <Card title="Services" icon="gears" href="/concepts/services">
+    Learn about AuthService and route guards
+  </Card>
+  <Card title="Module Structure" icon="sitemap" href="/concepts/module-structure">
+    Understand feature module organization
+  </Card>
+  <Card title="RxJS Patterns" icon="diagram-project" href="/concepts/rxjs">
+    Explore reactive routing with observables
+  </Card>
+</CardGroup>

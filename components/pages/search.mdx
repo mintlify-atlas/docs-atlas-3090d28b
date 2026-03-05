@@ -1,0 +1,306 @@
+---
+title: 'Search Page'
+description: 'Main search interface with OMDB integration and featured media carousel'
+icon: 'magnifying-glass'
+---
+
+## Overview
+
+The Search page is the main landing page of ScreenPulse, allowing users to search for movies, series, and games using the OMDB API. It features a carousel of featured media, a search bar with filters, and a results table.
+
+**Location**: `src/app/pages/search/page/search.component.ts`
+
+## Key Features
+
+- **OMDB Integration**: Fetches media data from the OMDB API
+- **Featured Carousel**: Displays curated media items
+- **Advanced Search**: Filter by title, type, and year
+- **Pagination**: Server-side pagination for search results
+- **Add to Favorites**: Quick-add functionality with authentication check
+- **Media Details Dialog**: View full details in a modal
+
+## Component Architecture
+
+### Main Component
+
+```typescript
+@Component({
+  selector: 'app-search',
+  templateUrl: './search.component.html',
+  styleUrls: ['./search.component.scss']
+})
+export class SearchComponent {
+  featuredMedia: MediaItem[] = FEATURED_MEDIA;
+  displayedColumns: string[] = ['title', 'year', 'type', 'poster', 'Add'];
+  
+  searchState: SearchState = {
+    title: '',
+    type: 'all',
+    year: '',
+    currentPage: 1,
+    pageSize: 10,
+    collection: [],
+    collectionSize: 0,
+    searchOnProcess: false,
+  };
+
+  loadingCard = false;
+
+  @ViewChild(SearchBarComponent) SearchComponent!: SearchBarComponent | null;
+
+  constructor(
+    private omdbService: OmdbService,
+    private toastrService: ToastrService,
+    private favoritesService: FavoritesService,
+    private authService: AuthService,
+    private router: Router,
+    private dialogService: DialogService
+  ) { }
+}
+```
+
+## Sub-Components
+
+The search page is composed of several specialized components:
+
+### 1. Search Cover
+
+**Component**: `SearchCoverComponent`  
+**Purpose**: Displays the hero section with category icons (Movies, TV Shows, Videogames)
+
+```html
+<app-search-cover></app-search-cover>
+```
+
+### 2. Search Bar
+
+**Component**: `SearchBarComponent`  
+**Purpose**: Reactive form for entering search criteria
+
+<ParamField path="searchSubmitted" type="EventEmitter<SearchFilters>">
+  Emits search filters when form is submitted
+</ParamField>
+
+**Usage**:
+```html
+<app-search-bar (searchSubmitted)="handleSubmit($event)"></app-search-bar>
+```
+
+**Search Filters Interface**:
+```typescript
+interface SearchFilters {
+  title: string;
+  type: 'movie' | 'series' | 'game' | 'all';
+  year: string;
+}
+```
+
+### 3. Carousel
+
+**Component**: `CarouselComponent`  
+**Purpose**: Displays featured media in an auto-rotating carousel
+
+<ParamField path="collection" type="MediaItem[]">
+  Array of media items to display
+</ParamField>
+
+<ParamField path="sendItemCarousel" type="EventEmitter<MediaItem>">
+  Emits when user clicks on a media item
+</ParamField>
+
+**Usage**:
+```html
+<app-carousel 
+  (sendItemCarousel)="openMediaItem($event)" 
+  [collection]="featuredMedia">
+</app-carousel>
+```
+
+### 4. Movie Results Table
+
+**Component**: `MediaItemResultsTableComponent`  
+**Purpose**: Displays search results in a sortable, paginated table
+
+<ParamField path="collection" type="MediaItem[]">
+  Search results to display
+</ParamField>
+
+<ParamField path="collectionSize" type="number">
+  Total number of results for pagination
+</ParamField>
+
+<ParamField path="currentPage" type="number">
+  Current page index (1-based)
+</ParamField>
+
+<ParamField path="pageSize" type="number">
+  Number of items per page
+</ParamField>
+
+<ParamField path="displayedColumns" type="string[]">
+  Array of column names to display
+</ParamField>
+
+<ParamField path="pageChanged" type="EventEmitter<number>">
+  Emits when user navigates to a different page
+</ParamField>
+
+<ParamField path="detailsOpened" type="EventEmitter<MediaItem>">
+  Emits when user clicks to view details
+</ParamField>
+
+<ParamField path="favoriteAdded" type="EventEmitter<MediaItem>">
+  Emits when user adds item to favorites
+</ParamField>
+
+**Usage**:
+```html
+<app-movie-results-table 
+  [displayedColumns]="displayedColumns" 
+  [collection]="searchState.collection" 
+  [collectionSize]="searchState.collectionSize"
+  [currentPage]="searchState.currentPage" 
+  [pageSize]="searchState.pageSize" 
+  (pageChanged)="loadPage($event)"
+  (detailsOpened)="openMediaItem($event)" 
+  (favoriteAdded)="addToFavorites($event)">
+</app-movie-results-table>
+```
+
+## Core Methods
+
+### handleSubmit()
+
+Processes search form submission and fetches results.
+
+```typescript
+handleSubmit(filters: SearchFilters): void {
+  this.searchState = {
+    ...this.searchState,
+    ...filters,
+    currentPage: 1,
+    searchOnProcess: true
+  };
+  this.fetchMediaItems();
+}
+```
+
+### loadPage()
+
+Handles pagination events.
+
+```typescript
+loadPage(page: number): void {
+  this.searchState.currentPage = page;
+  this.fetchMediaItems();
+}
+```
+
+### addToFavorites()
+
+Adds a media item to the user's favorites with authentication check.
+
+```typescript
+addToFavorites(mediaItem: MediaItem) {
+  this.authService.isLoggedInObservable().pipe(
+    take(1),
+    switchMap(loggedIn => {
+      if (!loggedIn) {
+        this.toastrService.warning('You must be logged in to add movies to your list', 'Error');
+        this.router.navigate(['/auth/login']);
+        return EMPTY; 
+      }
+      return this.favoritesService.addToFavorites(mediaItem);
+    })
+  ).subscribe({
+    next: () => this.toastrService.success(mediaItem.title, 'Added to favorites'),
+    error: (error) => this.toastrService.warning(error.message)
+  });
+}
+```
+
+### openMediaItem()
+
+Opens the media details dialog.
+
+```typescript
+openMediaItem(mediaItem: MediaItem): void {
+  this.loadingCard = true;
+  this.dialogService
+    .openMediaItem(window.innerWidth, mediaItem, false)
+    .pipe(finalize(() => (this.loadingCard = false)))
+    .subscribe();
+}
+```
+
+## OmdbService Integration
+
+The component uses `OmdbService` to fetch media data:
+
+```typescript
+this.omdbService.fetchMediaItems(
+  this.searchState.title,
+  this.searchState.type,
+  this.searchState.year,
+  this.searchState.currentPage
+).subscribe({
+  next: (response) => {
+    if (response.Response === "True") {
+      this.searchState.collection = response.Search || [];
+      this.searchState.collectionSize = Number(response.totalResults) || 0;
+    } else {
+      this.toastrService.warning(response.Error, 'Try again!');
+      this.searchState.collection = [];
+    }
+    this.searchState.searchOnProcess = false;
+  },
+  error: (error) => {
+    this.toastrService.error(error.message);
+    this.searchState.searchOnProcess = false;
+  }
+});
+```
+
+## Template Structure
+
+```html
+<section>
+  <app-search-cover></app-search-cover>
+</section>
+
+<section class="search-container-section">
+  <div class="title">
+    <h1>Use the search bar to find by title, type, and year in our huge database.</h1>
+    <h4>Powered by OMDB API & IMDB</h4>
+  </div>
+
+  <div class="search-container">
+    <app-carousel (sendItemCarousel)="openMediaItem($event)" [collection]="featuredMedia"></app-carousel>
+    <app-search-bar (searchSubmitted)="handleSubmit($event)"></app-search-bar>
+    <app-loading-spinner [visible]="searchState.searchOnProcess"></app-loading-spinner>
+  </div>
+</section>
+
+<section class="table-section" *ngIf="searchState.collection.length>0">
+  <h1>This is what we have found...</h1>
+  <app-movie-results-table 
+    [displayedColumns]="displayedColumns" 
+    [collection]="searchState.collection" 
+    [collectionSize]="searchState.collectionSize"
+    [currentPage]="searchState.currentPage" 
+    [pageSize]="searchState.pageSize" 
+    (pageChanged)="loadPage($event)"
+    (detailsOpened)="openMediaItem($event)" 
+    (favoriteAdded)="addToFavorites($event)">
+  </app-movie-results-table>
+</section>
+```
+
+## Dependencies
+
+- **OmdbService**: Fetches media data from OMDB API
+- **FavoritesService**: Manages user favorites
+- **AuthService**: Handles authentication state
+- **DialogService**: Opens media detail dialogs
+- **ToastrService**: Displays notifications
+- **Router**: Navigation handling

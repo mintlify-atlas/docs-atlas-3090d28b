@@ -1,0 +1,378 @@
+---
+title: 'AuthInterceptor'
+description: 'HTTP interceptor for automatic JWT token injection and session expiry handling'
+icon: 'key'
+---
+
+## Overview
+
+The `AuthInterceptor` is an Angular HTTP interceptor that automatically injects JWT authentication tokens into outgoing HTTP requests and handles 401 (Unauthorized) errors for session expiry.
+
+## Import
+
+```typescript
+import { AuthInterceptor } from 'src/app/core/interceptors/auth.interceptor';
+import { HTTP_INTERCEPTORS } from '@angular/common/http';
+```
+
+## Implementation
+
+```typescript
+import { AuthService } from './../services/auth.service';
+import { Injectable } from '@angular/core';
+import { HttpEvent, HttpInterceptor, HttpHandler, HttpRequest, HttpErrorResponse } from '@angular/common/http';
+import { Observable, throwError } from 'rxjs';
+import { catchError } from 'rxjs/operators';
+import { Router } from '@angular/router';
+
+@Injectable()
+export class AuthInterceptor implements HttpInterceptor {
+  constructor(private router: Router, private authService: AuthService) {}
+
+  intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+    const token = this.authService.getAuthToken();
+    let authReq = req;
+    if (token) {
+      authReq = req.clone({
+        setHeaders: { Authorization: `Bearer ${token}` }
+      });
+    }
+    return next.handle(authReq).pipe(
+      catchError((error: HttpErrorResponse) => {
+        if (error.status === 401 && error.message === 'Session expired. Please login again') {
+          this.authService.logOut();
+          this.router.navigate(['/auth/login']);
+        }
+        return throwError(() => error);
+      })
+    );
+  }
+}
+```
+
+## Method
+
+### intercept
+
+Intercepts HTTP requests to inject authentication tokens and handle auth errors.
+
+```typescript
+intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>>
+```
+
+<ParamField path="req" type="HttpRequest<unknown>" required>
+  The outgoing HTTP request
+</ParamField>
+
+<ParamField path="next" type="HttpHandler" required>
+  The next interceptor in the chain or the backend
+</ParamField>
+
+<ResponseField name="return" type="Observable<HttpEvent<unknown>>">
+  Observable of HTTP events
+</ResponseField>
+
+**Behavior:**
+
+1. **Token Injection:**
+   - Retrieves JWT token from `AuthService`
+   - If token exists, clones the request and adds `Authorization` header
+   - Format: `Authorization: Bearer {token}`
+
+2. **Error Handling:**
+   - Catches HTTP errors using `catchError`
+   - If error is 401 with "Session expired" message:
+     - Logs out the user via `AuthService.logOut()`
+     - Redirects to login page
+   - Re-throws the error for component-level handling
+
+## Registration
+
+### app.module.ts
+
+```typescript
+import { NgModule } from '@angular/core';
+import { HTTP_INTERCEPTORS, HttpClientModule } from '@angular/common/http';
+import { AuthInterceptor } from './core/interceptors/auth.interceptor';
+
+@NgModule({
+  imports: [
+    HttpClientModule,
+    // other imports
+  ],
+  providers: [
+    {
+      provide: HTTP_INTERCEPTORS,
+      useClass: AuthInterceptor,
+      multi: true
+    }
+  ]
+})
+export class AppModule {}
+```
+
+<Warning>
+  **Important**: Set `multi: true` to allow multiple interceptors to be registered. Without it, this interceptor will replace all other interceptors.
+</Warning>
+
+## Usage Examples
+
+### Automatic Token Injection
+
+```typescript
+import { Component } from '@angular/core';
+import { FavoritesService } from 'src/app/shared/services/favorites/favorites.service';
+
+@Component({
+  selector: 'app-favorites',
+  templateUrl: './favorites.component.html'
+})
+export class FavoritesComponent {
+  constructor(private favoritesService: FavoritesService) {}
+
+  loadFavorites() {
+    // No need to manually add Authorization header!
+    // AuthInterceptor automatically injects the token
+    this.favoritesService.getFavorites(1, 10).subscribe({
+      next: (response) => {
+        console.log('Favorites:', response.favorites);
+      },
+      error: (error) => {
+        // If 401 error with session expired message,
+        // user is automatically logged out and redirected
+      }
+    });
+  }
+}
+```
+
+### Before and After Interception
+
+**Without AuthInterceptor (manual approach):**
+
+```typescript
+// Manual token injection - NOT NEEDED with interceptor
+const token = this.authService.getAuthToken();
+const headers = new HttpHeaders({
+  'Authorization': `Bearer ${token}`
+});
+
+this.http.get('/api/favorites', { headers }).subscribe(...);
+```
+
+**With AuthInterceptor (automatic):**
+
+```typescript
+// Token automatically injected - clean code!
+this.http.get('/api/favorites').subscribe(...);
+```
+
+## Request Flow
+
+### Successful Request with Token
+
+1. Service makes HTTP request (e.g., `http.get('/api/favorites')`)
+2. **AuthInterceptor intercepts** the request
+3. Retrieves token from `AuthService.getAuthToken()`
+4. Clones request and adds `Authorization: Bearer {token}` header
+5. Passes modified request to next handler
+6. Backend validates token
+7. Response returned to service
+
+### Request without Token
+
+1. Service makes HTTP request
+2. **AuthInterceptor intercepts** the request
+3. No token found in `AuthService`
+4. Request passes through unchanged (no Authorization header)
+5. Backend may return 401 if authentication is required
+
+### Session Expiry (401 Error)
+
+1. Service makes HTTP request
+2. AuthInterceptor adds token
+3. Backend validates token and detects expiry
+4. Backend returns **401 Unauthorized** with message "Session expired. Please login again"
+5. **AuthInterceptor catches error**
+6. Calls `authService.logOut()` to clear session
+7. Redirects to `/auth/login`
+8. Shows toast notification (via ErrorInterceptor)
+9. Error re-thrown for component handling
+
+## Error Handling
+
+### Session Expired (401)
+
+```typescript
+if (error.status === 401 && error.message === 'Session expired. Please login again') {
+  this.authService.logOut(); // Clear session storage
+  this.router.navigate(['/auth/login']); // Redirect to login
+}
+```
+
+### Other 401 Errors
+
+If the 401 error doesn't match the session expired message, it's passed through to the component:
+
+```typescript
+this.favoritesService.addToFavorites(mediaItem).subscribe({
+  error: (error) => {
+    if (error.status === 401) {
+      // Handle unauthorized access
+      console.error('Unauthorized:', error.message);
+    }
+  }
+});
+```
+
+## Testing
+
+```typescript
+import { TestBed } from '@angular/core/testing';
+import { HttpClientTestingModule, HttpTestingController } from '@angular/common/http/testing';
+import { HTTP_INTERCEPTORS, HttpClient, HttpErrorResponse } from '@angular/common/http';
+import { Router } from '@angular/router';
+import { AuthInterceptor } from './auth.interceptor';
+import { AuthService } from '../services/auth.service';
+
+describe('AuthInterceptor', () => {
+  let httpMock: HttpTestingController;
+  let httpClient: HttpClient;
+  let authService: jasmine.SpyObj<AuthService>;
+  let router: jasmine.SpyObj<Router>;
+
+  beforeEach(() => {
+    const authServiceSpy = jasmine.createSpyObj('AuthService', ['getAuthToken', 'logOut']);
+    const routerSpy = jasmine.createSpyObj('Router', ['navigate']);
+
+    TestBed.configureTestingModule({
+      imports: [HttpClientTestingModule],
+      providers: [
+        { provide: HTTP_INTERCEPTORS, useClass: AuthInterceptor, multi: true },
+        { provide: AuthService, useValue: authServiceSpy },
+        { provide: Router, useValue: routerSpy }
+      ]
+    });
+
+    httpMock = TestBed.inject(HttpTestingController);
+    httpClient = TestBed.inject(HttpClient);
+    authService = TestBed.inject(AuthService) as jasmine.SpyObj<AuthService>;
+    router = TestBed.inject(Router) as jasmine.SpyObj<Router>;
+  });
+
+  afterEach(() => {
+    httpMock.verify();
+  });
+
+  it('should add Authorization header when token exists', () => {
+    const token = 'test-token-123';
+    authService.getAuthToken.and.returnValue(token);
+
+    httpClient.get('/api/test').subscribe();
+
+    const req = httpMock.expectOne('/api/test');
+    expect(req.request.headers.has('Authorization')).toBe(true);
+    expect(req.request.headers.get('Authorization')).toBe(`Bearer ${token}`);
+  });
+
+  it('should not add Authorization header when token is null', () => {
+    authService.getAuthToken.and.returnValue(null);
+
+    httpClient.get('/api/test').subscribe();
+
+    const req = httpMock.expectOne('/api/test');
+    expect(req.request.headers.has('Authorization')).toBe(false);
+  });
+
+  it('should logout and redirect on 401 session expired error', () => {
+    authService.getAuthToken.and.returnValue('token');
+
+    httpClient.get('/api/test').subscribe(
+      () => fail('should have failed with 401 error'),
+      (error: HttpErrorResponse) => {
+        expect(error.status).toBe(401);
+        expect(authService.logOut).toHaveBeenCalled();
+        expect(router.navigate).toHaveBeenCalledWith(['/auth/login']);
+      }
+    );
+
+    const req = httpMock.expectOne('/api/test');
+    req.flush(
+      { message: 'Session expired. Please login again' },
+      { status: 401, statusText: 'Unauthorized' }
+    );
+  });
+});
+```
+
+## Multiple Interceptors
+
+AuthInterceptor works alongside other interceptors. They execute in the order they're registered:
+
+```typescript
+providers: [
+  {
+    provide: HTTP_INTERCEPTORS,
+    useClass: AuthInterceptor,
+    multi: true
+  },
+  {
+    provide: HTTP_INTERCEPTORS,
+    useClass: ErrorInterceptor, // Runs after AuthInterceptor
+    multi: true
+  }
+]
+```
+
+**Execution Order:**
+1. **Request phase**: AuthInterceptor → ErrorInterceptor → Backend
+2. **Response phase**: Backend → ErrorInterceptor → AuthInterceptor → Component
+
+## Security Considerations
+
+<Warning>
+  **Security Best Practices:**
+  
+  1. **HTTPS Only**: Always use HTTPS in production to protect tokens during transmission.
+  
+  2. **Token Storage**: Tokens are stored in session storage (not local storage), which is cleared when the browser closes.
+  
+  3. **Token Expiry**: Backend must validate token expiry and return 401 with the specific message.
+  
+  4. **No Token Logging**: Never log the actual token value in production code.
+  
+  5. **Selective Injection**: Only inject tokens for authenticated API endpoints, not for public resources.
+</Warning>
+
+## Skipping Interceptor (Optional Enhancement)
+
+```typescript
+import { HttpContext, HttpContextToken } from '@angular/common/http';
+
+// Create a context token
+export const SKIP_AUTH = new HttpContextToken<boolean>(() => false);
+
+// In interceptor
+intercept(req: HttpRequest<unknown>, next: HttpHandler): Observable<HttpEvent<unknown>> {
+  // Skip auth for specific requests
+  if (req.context.get(SKIP_AUTH)) {
+    return next.handle(req);
+  }
+  
+  // Normal auth logic
+  const token = this.authService.getAuthToken();
+  // ...
+}
+
+// In service
+this.http.get('/api/public', {
+  context: new HttpContext().set(SKIP_AUTH, true)
+});
+```
+
+## Related
+
+- [AuthService](/api/services/auth-service) - Provides authentication tokens
+- [AuthGuard](/api/guards/auth-guard) - Protects routes
+- [ErrorInterceptor](/api/interceptors/error-interceptor) - Handles HTTP errors
+- [FavoritesService](/api/services/favorites-service) - Example service using authenticated requests

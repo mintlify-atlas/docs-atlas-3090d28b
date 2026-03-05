@@ -1,0 +1,125 @@
+---
+title: "Introduction"
+description: "Welcome to ScreenPulse - Your gateway to discovering and managing movies, series, and games"
+---
+
+<img
+  className="block dark:hidden"
+  src="https://github.com/EduGese/ScreenPulse-frontApp/assets/122921699/e5ce912a-9c6a-4f76-9eac-dea620fac265"
+  alt="ScreenPulse Hero Light"
+/>
+<img
+  className="hidden dark:block"
+  src="https://github.com/EduGese/ScreenPulse-frontApp/assets/122921699/e5ce912a-9c6a-4f76-9eac-dea620fac265"
+  alt="ScreenPulse Hero Dark"
+/>
+
+## Welcome to ScreenPulse
+
+ScreenPulse is a modern Angular application designed to help you discover, organize, and manage your favorite movies, series, and video games. Built with Angular 16 and powered by the OMDB API, ScreenPulse provides a seamless experience for media enthusiasts.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with ScreenPulse in under 5 minutes
+  </Card>
+  <Card title="Installation" icon="download" href="/installation">
+    Complete installation guide for local development
+  </Card>
+  <Card title="Components" icon="puzzle-piece" href="/components/pages/search">
+    Explore the component library and architecture
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/services/auth-service">
+    Comprehensive API documentation for services and models
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<AccordionGroup>
+  <Accordion title="Smart Search" icon="magnifying-glass">
+    Search for movies, series, and video games using the OMDB API. Filter by title, type, year, and more with instant results and pagination support.
+  </Accordion>
+  
+  <Accordion title="User Authentication" icon="shield-check">
+    Secure user registration and login system with JWT token-based authentication. Sessions are managed securely with HTTP interceptors.
+  </Accordion>
+  
+  <Accordion title="Favorites Management" icon="star">
+    Save your favorite media items to personal collections. Add custom notes and reviews, organize by type, and sort by various criteria.
+  </Accordion>
+  
+  <Accordion title="Detailed Information" icon="info-circle">
+    View comprehensive details including ratings, cast, plot summaries, and embedded trailers for movies and series.
+  </Accordion>
+  
+  <Accordion title="Responsive Design" icon="mobile">
+    Fully responsive interface built with Angular Material and ng-bootstrap. Optimized for devices from 320px to 1920px+.
+  </Accordion>
+  
+  <Accordion title="Modern Architecture" icon="layer-group">
+    Feature-based modules with lazy loading, RxJS reactive patterns, and component-driven development with Storybook.
+  </Accordion>
+</AccordionGroup>
+
+## Tech Stack
+
+ScreenPulse is built with modern web technologies and best practices:
+
+- **Framework**: Angular 16.2.12 with TypeScript 5.1
+- **UI Libraries**: Angular Material, ng-bootstrap
+- **State Management**: RxJS for reactive data streams
+- **API Integration**: Custom backend API (Node.js/Express) + OMDB API
+- **Database**: MongoDB Atlas for user data and favorites
+- **Documentation**: Storybook for component documentation
+- **Testing**: Jasmine and Karma for unit testing
+- **Deployment**: Firebase Hosting (frontend) + Render (backend)
+
+## Live Demo
+
+<Card title="Try ScreenPulse" icon="play" href="https://sreenpulse.web.app/">
+  Experience the live application deployed on Firebase
+</Card>
+
+## Architecture Overview
+
+ScreenPulse follows Angular best practices with a modular architecture:
+
+```
+src/app/
+├── core/           # Singleton services, guards, interceptors
+├── layout/         # App shell components (navbar, footer)
+├── pages/          # Feature modules (search, favorites, auth)
+├── shared/         # Reusable components, models, utilities
+└── app.module.ts   # Root module
+```
+
+<CardGroup cols={3}>
+  <Card title="Core Concepts" icon="brain" href="/concepts/architecture">
+    Learn about the application architecture
+  </Card>
+  <Card title="Module Structure" icon="folder-tree" href="/concepts/module-structure">
+    Understand the module organization
+  </Card>
+  <Card title="Routing" icon="route" href="/concepts/routing">
+    Explore the routing configuration
+  </Card>
+</CardGroup>
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="GitHub Repository" icon="github" href="https://github.com/EduGese/ScreenPulse-frontApp">
+    View source code and report issues
+  </Card>
+  <Card title="Storybook" icon="book" href="https://edugese.github.io/ScreenPulse-frontApp/">
+    Interactive component documentation
+  </Card>
+</CardGroup>
+
+## Next Steps
+
+Ready to get started? Follow our quickstart guide to set up your development environment and start exploring ScreenPulse.
+
+<Card title="Get Started" icon="arrow-right" href="/quickstart" horizontal>
+  Follow the quickstart guide to install and run ScreenPulse locally
+</Card>
