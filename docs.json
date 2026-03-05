@@ -107,9 +107,10 @@
             "group": "Services",
             "pages": [
               "api/services/auth-service",
+              "api/services/user-service",
               "api/services/omdb-service",
               "api/services/favorites-service",
-              "api/services/user-service"
+              "api/services/dialog-service"
             ]
           },
           {

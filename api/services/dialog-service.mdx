@@ -1,0 +1,225 @@
+---
+title: 'DialogService'
+description: 'Service for managing Material dialogs including media details and trailer playback'
+icon: 'window'
+---
+
+## Overview
+
+The `DialogService` is a shared Angular service that manages Material Design dialogs for displaying media item details and trailers. It uses lazy loading to dynamically import dialog components on demand, improving initial load performance.
+
+## Import
+
+```typescript
+import { DialogService } from 'src/app/shared/services/dialog/dialog.service';
+import { MediaItem } from 'src/app/shared/models/movie.model';
+```
+
+## Dependencies
+
+The service depends on:
+- `MatDialog` from `@angular/material/dialog`
+- `OmdbService` for fetching detailed media information
+- `ToastrService` from `ngx-toastr` for error notifications
+
+## Methods
+
+### openMediaItem
+
+Opens a Material dialog displaying detailed information about a media item (movie, series, or game). The dialog is lazily loaded and its size adapts to the window dimensions.
+
+```typescript
+openMediaItem(
+  windowWidth: number,
+  mediaItem: MediaItem,
+  fromFavoritesSection: boolean
+): Observable<void>
+```
+
+<ParamField path="windowWidth" type="number" required>
+  The current window width in pixels, used to calculate optimal dialog dimensions
+</ParamField>
+
+<ParamField path="mediaItem" type="MediaItem" required>
+  The media item to display. Must include at minimum the `imdbID` property
+</ParamField>
+
+<ParamField path="fromFavoritesSection" type="boolean" required>
+  Indicates whether the dialog was opened from the favorites page (enables edit/delete actions)
+</ParamField>
+
+<ResponseField name="return" type="Observable<void>">
+  An Observable that completes when the dialog operation finishes. Errors are handled internally with toast notifications.
+</ResponseField>
+
+**Dialog Sizing:**
+
+The dialog automatically adjusts its dimensions based on window width:
+- **Mobile (&lt;600px)**: 90% height, 80% width
+- **Tablet (600-800px)**: 85% height, 70% width  
+- **Desktop (&gt;800px)**: 85% height, 85% width
+
+**Example:**
+
+```typescript navbar.component.ts
+import { DialogService } from 'src/app/shared/services/dialog/dialog.service';
+import { MediaItem } from 'src/app/shared/models/movie.model';
+
+export class NavbarComponent {
+  constructor(private dialogService: DialogService) {}
+
+  openMovieDetails(movie: MediaItem) {
+    const windowWidth = window.innerWidth;
+    
+    this.dialogService.openMediaItem(windowWidth, movie, false)
+      .subscribe({
+        next: () => console.log('Dialog opened successfully'),
+        error: (err) => console.error('Failed to open dialog:', err)
+      });
+  }
+}
+```
+
+**Workflow:**
+
+<Steps>
+  <Step title="Fetch Details">
+    Calls `OmdbService.getMediaItemInfo()` to retrieve complete media details from OMDB API
+  </Step>
+  
+  <Step title="Lazy Load Component">
+    Dynamically imports `MediaItemDialogComponent` using dynamic `import()` for code splitting
+  </Step>
+  
+  <Step title="Open Dialog">
+    Opens the Material dialog with the fetched data and responsive dimensions
+  </Step>
+  
+  <Step title="Error Handling">
+    Shows toast notification if API call fails or component import fails
+  </Step>
+</Steps>
+
+---
+
+### openTrailerDialog
+
+Opens a Material dialog for playing a video trailer from a URL (typically YouTube). The component is lazily loaded on demand.
+
+```typescript
+openTrailerDialog(videoUrl: string): void
+```
+
+<ParamField path="videoUrl" type="string" required>
+  The URL of the video to play. Typically a YouTube URL that will be sanitized and embedded in an iframe
+</ParamField>
+
+**Dialog Configuration:**
+- Width: 80% of viewport width (max 1200px)
+- Height: 70% of viewport height (max 800px)
+- Auto-focus disabled for better UX
+- User can close by clicking outside or pressing ESC
+
+**Example:**
+
+```typescript movie-dialog.component.ts
+import { DialogService } from 'src/app/shared/services/dialog/dialog.service';
+
+export class MediaItemDialogComponent {
+  constructor(private dialogService: DialogService) {}
+
+  playTrailer(trailerUrl: string) {
+    this.dialogService.openTrailerDialog(trailerUrl);
+  }
+}
+```
+
+**Error Handling:**
+
+```typescript
+// If the TrailerDialogComponent fails to load, a toast error is displayed:
+// "Could not load trailer dialog"
+```
+
+## Implementation Details
+
+### Lazy Loading Pattern
+
+Both dialog methods use dynamic `import()` to lazy load their components:
+
+```typescript
+// Lazy loading with error handling
+import('../../components/movie-dialog/movie-dialog.component')
+  .then((module) => {
+    this.dialog.open(module.MediaItemDialogComponent, config);
+  })
+  .catch((error) => {
+    console.error('Failed to load component:', error);
+    this.toastrService.error('Could not load dialog');
+  });
+```
+
+This pattern:
+- Reduces initial bundle size
+- Loads dialog code only when needed
+- Improves application startup time
+
+### RxJS Integration
+
+`openMediaItem()` returns an Observable that chains:
+1. API call to fetch media details
+2. Component import
+3. Dialog opening
+
+```typescript
+return this.OmdbService.getMediaItemInfo(mediaItem.imdbID).pipe(
+  switchMap((response) => from(import('...'))),
+  tap({ /* open dialog */ }),
+  map(() => undefined)
+);
+```
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="MediaItem Model" icon="film" href="/api/models/media-item">
+    The data model passed to dialog methods
+  </Card>
+  
+  <Card title="OmdbService" icon="database" href="/api/services/omdb-service">
+    Service that fetches detailed media information
+  </Card>
+  
+  <Card title="Movie Dialog Component" icon="window" href="/components/shared/movie-dialog">
+    The lazily-loaded dialog component for media details
+  </Card>
+  
+  <Card title="Trailer Dialog Component" icon="play" href="/components/shared/trailer-dialog">
+    The lazily-loaded dialog component for video playback
+  </Card>
+</CardGroup>
+
+## Usage in Components
+
+DialogService is typically injected into components that need to display media details:
+
+```typescript
+// In navbar, search results, or favorites components
+constructor(private dialogService: DialogService) {}
+
+onMediaItemClick(item: MediaItem) {
+  this.dialogService.openMediaItem(
+    window.innerWidth,
+    item,
+    this.isOnFavoritesPage
+  ).subscribe();
+}
+```
+
+<Tip>
+  Always subscribe to the Observable returned by `openMediaItem()`, even if you don't need the result. This ensures the dialog operation executes.
+</Tip>
+
+<Note>
+  The service handles all error cases internally with toast notifications, so components don't need to implement additional error handling.
+</Note>
