@@ -1,0 +1,154 @@
+{
+  "projectType": "frontend",
+  "projectName": "ScreenPulse",
+  "projectDescription": "A modern Angular application for discovering and managing movies, series, and games with OMDB API integration, user authentication, and favorites management.",
+  "theme": "palm",
+  "primaryColor": "#E50914",
+  "lightColor": "#FF6B6B",
+  "darkColor": "#B20710",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Get Started",
+        "groups": [
+          {
+            "group": "Introduction",
+            "pages": ["introduction", "quickstart", "installation"]
+          },
+          {
+            "group": "Setup",
+            "pages": ["setup/environment", "setup/configuration", "setup/development"]
+          }
+        ]
+      },
+      {
+        "tab": "Components",
+        "groups": [
+          {
+            "group": "Layout",
+            "pages": ["components/layout/navbar", "components/layout/footer"]
+          },
+          {
+            "group": "Pages",
+            "pages": [
+              "components/pages/search",
+              "components/pages/favorites",
+              "components/pages/auth"
+            ]
+          },
+          {
+            "group": "Shared Components",
+            "pages": [
+              "components/shared/movie-dialog",
+              "components/shared/trailer-dialog",
+              "components/shared/loading-spinner",
+              "components/shared/empty-state"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Core Concepts",
+        "groups": [
+          {
+            "group": "Architecture",
+            "pages": [
+              "concepts/architecture",
+              "concepts/module-structure",
+              "concepts/routing",
+              "concepts/lazy-loading"
+            ]
+          },
+          {
+            "group": "State Management",
+            "pages": ["concepts/rxjs", "concepts/services", "concepts/reactive-patterns"]
+          }
+        ]
+      },
+      {
+        "tab": "Guides",
+        "groups": [
+          {
+            "group": "Features",
+            "pages": [
+              "guides/authentication",
+              "guides/search",
+              "guides/favorites",
+              "guides/media-details"
+            ]
+          },
+          {
+            "group": "Development",
+            "pages": [
+              "guides/api-integration",
+              "guides/error-handling",
+              "guides/styling",
+              "guides/testing"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Services",
+            "pages": [
+              "api/services/auth-service",
+              "api/services/omdb-service",
+              "api/services/favorites-service",
+              "api/services/user-service"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/media-item",
+              "api/models/auth-user",
+              "api/models/omdb-response"
+            ]
+          },
+          {
+            "group": "Guards & Interceptors",
+            "pages": [
+              "api/guards/auth-guard",
+              "api/interceptors/auth-interceptor",
+              "api/interceptors/error-interceptor"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Smart search for movies, series, and games via OMDB API",
+    "User authentication with JWT tokens",
+    "Favorites management with CRUD operations",
+    "Detailed media information with ratings and trailers",
+    "Personal reviews and notes on favorites",
+    "Responsive design with Angular Material and ng-bootstrap",
+    "Lazy-loaded feature modules",
+    "RxJS-based reactive state management",
+    "HTTP interceptors for auth and error handling",
+    "Storybook component documentation"
+  ],
+  "publicApiSurface": [
+    "AuthService.setUserSession()",
+    "AuthService.getAuthToken()",
+    "AuthService.isLoggedInObservable()",
+    "AuthService.logOut()",
+    "OmdbService.fetchMediaItems()",
+    "OmdbService.getMediaItemInfo()",
+    "FavoritesService.addToFavorites()",
+    "FavoritesService.getFavorites()",
+    "FavoritesService.deleteMediaItem()",
+    "FavoritesService.updateFavorite()",
+    "AuthGuard.canActivate()",
+    "AuthInterceptor.intercept()",
+    "ErrorInterceptor.intercept()",
+    "MediaItem",
+    "AuthUser",
+    "OmdbResponse",
+    "OmdbDetails"
+  ]
+}
